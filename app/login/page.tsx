@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signInWithGoogle, signInWithGithub } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
 
@@ -13,9 +14,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // State untuk mengontrol visibilitas password
+  const [showPassword, setShowPassword] = useState(false)
+
+  // Login States
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
 
+  // Register States
   const [regName, setRegName] = useState('')
   const [regEmail, setRegEmail] = useState('')
   const [regPassword, setRegPassword] = useState('')
@@ -32,7 +38,10 @@ export default function LoginPage() {
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Login failed'); return }
+      if (!res.ok) {
+        setError(data.error || 'Login failed')
+        return
+      }
 
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
@@ -59,7 +68,10 @@ export default function LoginPage() {
         body: JSON.stringify({ name: regName, email: regEmail, password: regPassword }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Registration failed'); return }
+      if (!res.ok) {
+        setError(data.error || 'Registration failed')
+        return
+      }
       setRegSuccess(true)
     } catch {
       setError('Network error. Please try again.')
@@ -69,7 +81,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#191919] flex items-center justify-center">
+    <div className="min-h-screen bg-[#191919] flex items-center justify-center p-4">
       <div className="bg-[#202020] border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-5 w-full max-w-sm">
 
         {/* Header */}
@@ -95,7 +107,11 @@ export default function LoginPage() {
 
           {/* GitHub */}
           <form action={signInWithGithub} className="w-full">
-            <Button type="submit" variant="outline" className="w-full gap-2 bg-[#24292e] text-white border-white/10 hover:bg-[#2f363d]">
+            <Button 
+              type="submit" 
+              variant="outline" 
+              className="w-full gap-2 bg-[#24292e] text-white border-white/10 hover:bg-[#24292e] hover:text-white"
+            >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="white">
                 <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
               </svg>
@@ -116,7 +132,12 @@ export default function LoginPage() {
           {(['login', 'register'] as const).map((t) => (
             <button
               key={t}
-              onClick={() => { setTab(t); setError(''); setRegSuccess(false) }}
+              onClick={() => { 
+                setTab(t); 
+                setError(''); 
+                setRegSuccess(false);
+                setShowPassword(false); // Sembunyikan password saat ganti tab
+              }}
               className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors capitalize
                 ${tab === t ? 'bg-white/10 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
             >
@@ -125,7 +146,7 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* Error */}
+        {/* Error Message */}
         {error && <p className="text-sm text-red-400 text-center w-full">{error}</p>}
 
         {/* Login Form */}
@@ -136,11 +157,23 @@ export default function LoginPage() {
               onChange={e => setLoginEmail(e.target.value)} required
               className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
             />
-            <input
-              type="password" placeholder="Password" value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)} required
-              className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
-            />
+            
+            <div className="relative w-full">
+              <input
+                type={showPassword ? "text" : "password"} 
+                placeholder="Password" value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)} required
+                className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 pr-10 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+
             <Button type="submit" disabled={loading} className="w-full bg-white text-black hover:bg-neutral-100 mt-1">
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
@@ -150,7 +183,7 @@ export default function LoginPage() {
         {/* Register Form */}
         {tab === 'register' && (
           regSuccess ? (
-            <div className="text-center">
+            <div className="text-center py-4">
               <p className="text-green-400 text-sm font-medium">🎉 Account created!</p>
               <p className="text-neutral-400 text-xs mt-1">Switch to Login tab to sign in.</p>
             </div>
@@ -166,11 +199,23 @@ export default function LoginPage() {
                 onChange={e => setRegEmail(e.target.value)} required
                 className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
               />
-              <input
-                type="password" placeholder="Password (min 8 characters)" value={regPassword}
-                onChange={e => setRegPassword(e.target.value)} required minLength={8}
-                className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
-              />
+              
+              <div className="relative w-full">
+                <input
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="Password (min 8 characters)" value={regPassword}
+                  onChange={e => setRegPassword(e.target.value)} required minLength={8}
+                  className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 pr-10 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
               <Button type="submit" disabled={loading} className="w-full bg-white text-black hover:bg-neutral-100 mt-1">
                 {loading ? 'Creating account...' : 'Create Account'}
               </Button>
