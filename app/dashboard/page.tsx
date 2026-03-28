@@ -9,7 +9,7 @@ export default async function DashboardPage() {
       <div className="text-center">
         <p className="text-4xl mb-4">👋</p>
         <h1 className="text-2xl font-bold text-white">
-          Welcome, {user?.user_metadata?.full_name?.split(' ')[0] ?? 'there'}
+          Welcome, {(user?.user_metadata?.full_name ?? user?.user_metadata?.name)?.split(' ')[0] ?? 'there'}
         </h1>
         <p className="text-neutral-400 mt-2 text-sm">
           Select a page from the sidebar, or create a new one.

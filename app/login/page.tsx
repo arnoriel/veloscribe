@@ -1,14 +1,104 @@
+'use client'
+
+import { useState } from 'react'
 import { signInWithGoogle } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
+
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const [tab, setTab] = useState<'login' | 'register'>('login')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  // Login state
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+
+  // Register state
+  const [regName, setRegName] = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [regSuccess, setRegSuccess] = useState(false)
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Login failed')
+        return
+      }
+
+      // Simpan token ke localStorage (atau bisa pakai cookie via server action)
+      localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('refresh_token', data.refresh_token)
+
+      // Set session ke Supabase client supaya middleware Next.js bisa baca
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      })
+
+      router.push('/dashboard')
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: regName, email: regEmail, password: regPassword }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Registration failed')
+        return
+      }
+
+      setRegSuccess(true)
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#191919] flex items-center justify-center">
       <div className="bg-[#202020] border border-white/10 rounded-2xl p-10 flex flex-col items-center gap-6 w-full max-w-sm">
+        {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white">VeloScribe</h1>
           <p className="text-sm text-neutral-400 mt-1">Your AI-powered workspace</p>
         </div>
+
+        {/* Google Button */}
         <form action={signInWithGoogle} className="w-full">
           <Button type="submit" variant="outline" className="w-full gap-2 bg-white text-black hover:bg-neutral-100">
             <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -20,6 +110,98 @@ export default function LoginPage() {
             Continue with Google
           </Button>
         </form>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 w-full">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-xs text-neutral-500">or</span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex w-full rounded-lg bg-[#191919] p-1 gap-1">
+          {(['login', 'register'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setError(''); setRegSuccess(false) }}
+              className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors capitalize
+                ${tab === t ? 'bg-white/10 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p className="text-sm text-red-400 text-center w-full">{error}</p>
+        )}
+
+        {/* Login Form */}
+        {tab === 'login' && (
+          <form onSubmit={handleLogin} className="w-full flex flex-col gap-3">
+            <input
+              type="email"
+              placeholder="Email"
+              value={loginEmail}
+              onChange={e => setLoginEmail(e.target.value)}
+              required
+              className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              required
+              className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+            />
+            <Button type="submit" disabled={loading} className="w-full bg-white text-black hover:bg-neutral-100 mt-1">
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+        )}
+
+        {/* Register Form */}
+        {tab === 'register' && (
+          regSuccess ? (
+            <div className="text-center">
+              <p className="text-green-400 text-sm font-medium">🎉 Account created!</p>
+              <p className="text-neutral-400 text-xs mt-1">Switch to Login tab to sign in.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleRegister} className="w-full flex flex-col gap-3">
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={regName}
+                onChange={e => setRegName(e.target.value)}
+                required
+                className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={regEmail}
+                onChange={e => setRegEmail(e.target.value)}
+                required
+                className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+              />
+              <input
+                type="password"
+                placeholder="Password (min 8 characters)"
+                value={regPassword}
+                onChange={e => setRegPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full bg-[#191919] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30"
+              />
+              <Button type="submit" disabled={loading} className="w-full bg-white text-black hover:bg-neutral-100 mt-1">
+                {loading ? 'Creating account...' : 'Create Account'}
+              </Button>
+            </form>
+          )
+        )}
       </div>
     </div>
   )
