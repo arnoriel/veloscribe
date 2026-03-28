@@ -13,20 +13,10 @@ export async function signInWithGoogle() {
   if (data.url) redirect(data.url)
 }
 
-export async function signInWithFacebook() {
+export async function signInWithGithub() {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'facebook',
-    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` },
-  })
-  if (error) throw error
-  if (data.url) redirect(data.url)
-}
-
-export async function signInWithApple() {
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'apple',
+    provider: 'github',
     options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` },
   })
   if (error) throw error
