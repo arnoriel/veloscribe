@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#191919] text-white px-6 py-16 max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Privacy Policy</h1>
-      <p className="text-neutral-400 text-sm mb-8">Last updated: March 28, 2025</p>
+      <p className="text-neutral-400 text-sm mb-8">Last updated: March 28, 2026</p>
 
       <section className="mb-6">
         <h2 className="text-lg font-semibold mb-2">1. Information We Collect</h2>
