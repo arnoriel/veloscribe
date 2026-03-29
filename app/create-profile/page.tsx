@@ -76,10 +76,6 @@ export default function CreateProfilePage() {
       return
     }
     setError('')
-    // Pre-fill workspace name with suggestion when moving to step 2
-    if (!workspaceName.trim()) {
-      setWorkspaceName(suggestedWorkspaceName)
-    }
     setDir(1)
     setStep(2)
   }
@@ -288,8 +284,8 @@ export default function CreateProfilePage() {
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: C.dim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Workspace Name</label>
                   <input
                     type="text"
-                    placeholder={suggestedWorkspaceName}
                     value={workspaceName}
+                    placeholder={suggestedWorkspaceName}
                     onChange={(e) => setWorkspaceName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleFinish()}
                     style={{ width: '100%', padding: '12px 14px', fontSize: 15, fontFamily: 'var(--font-jakarta)', fontWeight: 500, color: '#E2EAFF', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(226,234,255,0.12)', borderRadius: 10, outline: 'none', boxSizing: 'border-box', transition: 'all 0.2s' }}
