@@ -8,7 +8,8 @@ export type SaveProfileResult =
 
 export async function saveProfile(
   fullName: string,
-  avatarEmoji: string,
+  /** Either an emoji string (e.g. "🦊") or a full https:// URL from OAuth */
+  avatarValue: string,
   workspaceName: string
 ): Promise<SaveProfileResult> {
   try {
@@ -27,7 +28,7 @@ export async function saveProfile(
       {
         id: user.id,
         full_name: fullName.trim(),
-        avatar_url: avatarEmoji,
+        avatar_url: avatarValue,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }

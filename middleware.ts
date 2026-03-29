@@ -33,35 +33,39 @@ export async function middleware(request: NextRequest) {
 
   // ── Not authenticated ──────────────────────────────────────
   if (!user) {
-    // Protect dashboard and create-profile
     if (pathname.startsWith('/dashboard') || pathname === '/create-profile') {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     return supabaseResponse
   }
 
-  // ── Authenticated — check profile completion ───────────────
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
+  // ── Authenticated — check onboarding via workspace (NOT full_name) ─────────
+  //
+  // Google & GitHub OAuth auto-populate full_name in profiles, so checking
+  // full_name gives a false "complete" signal. A workspace only exists after
+  // the user finishes /create-profile, making it the reliable onboarding flag.
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', user.id)
+    .limit(1)
     .maybeSingle()
 
-  const profileComplete = !!(profile?.full_name)
+  const onboardingComplete = !!workspace
 
   // Already logged in → don't let them stay on /login
   if (pathname === '/login') {
-    const dest = profileComplete ? '/dashboard' : '/create-profile'
+    const dest = onboardingComplete ? '/dashboard' : '/create-profile'
     return NextResponse.redirect(new URL(dest, request.url))
   }
 
-  // Trying to access dashboard but no profile yet → must complete profile first
-  if (pathname.startsWith('/dashboard') && !profileComplete) {
+  // Trying to access dashboard but onboarding not done → must complete profile first
+  if (pathname.startsWith('/dashboard') && !onboardingComplete) {
     return NextResponse.redirect(new URL('/create-profile', request.url))
   }
 
-  // Trying to access create-profile but profile already done → go to dashboard
-  if (pathname === '/create-profile' && profileComplete) {
+  // Trying to access create-profile but already onboarded → go to dashboard
+  if (pathname === '/create-profile' && onboardingComplete) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

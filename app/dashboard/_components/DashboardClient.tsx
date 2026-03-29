@@ -25,6 +25,54 @@ const C = {
   borderStrong: 'rgba(226,234,255,0.12)',
 }
 
+function isUrl(value: string) {
+  return value.startsWith('http://') || value.startsWith('https://')
+}
+
+/** Renders a URL-based photo or an emoji in the dashboard welcome header */
+function AvatarDisplay({ value, size = 50 }: { value: string; size?: number }) {
+  if (isUrl(value)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={value}
+        alt="Profile photo"
+        width={size}
+        height={size}
+        referrerPolicy="no-referrer"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 14,
+          objectFit: 'cover',
+          flexShrink: 0,
+          border: `1px solid ${C.accentBorder}`,
+          boxShadow: '0 4px 18px rgba(77,127,255,0.14)',
+        }}
+      />
+    )
+  }
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 14,
+        background: 'rgba(77,127,255,0.12)',
+        border: `1px solid ${C.accentBorder}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 24,
+        flexShrink: 0,
+        boxShadow: '0 4px 18px rgba(77,127,255,0.14)',
+      }}
+    >
+      {value}
+    </div>
+  )
+}
+
 /* ── Sub-components ─────────────────────────────────────────── */
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -365,23 +413,7 @@ export default function DashboardClient({
             marginBottom: 8,
           }}
         >
-          <div
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 14,
-              background: 'rgba(77,127,255,0.12)',
-              border: `1px solid ${C.accentBorder}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 24,
-              flexShrink: 0,
-              boxShadow: '0 4px 18px rgba(77,127,255,0.14)',
-            }}
-          >
-            {avatar}
-          </div>
+          <AvatarDisplay value={avatar} size={50} />
           <div>
             <div
               style={{

@@ -6,13 +6,12 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const error = searchParams.get('error')
 
-  // If provider returned an error, send to login with error info
+  // If provider returned an error, send to login
   if (error) {
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`)
   }
 
   if (!code) {
-    // No code and no error — something unexpected, send to login
     return NextResponse.redirect(`${origin}/login`)
   }
 
@@ -23,7 +22,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(exchangeError.message)}`)
   }
 
-  // Get the user after session is established
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -32,32 +30,24 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login`)
   }
 
-  // Retry profile check a few times to handle async trigger delay
-  // (Supabase triggers that create the profile row may not fire instantly)
-  let profile = null
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', user.id)
-      .maybeSingle()
+  // Check workspace — NOT full_name.
+  //
+  // Google & GitHub OAuth automatically populate full_name in the profiles
+  // table via Supabase's auth trigger, so checking full_name will ALWAYS look
+  // like the user completed onboarding even when they haven't.
+  //
+  // A workspace row is only created during the /create-profile onboarding flow,
+  // so it is the correct and reliable signal that onboarding is complete.
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', user.id)
+    .limit(1)
+    .maybeSingle()
 
-    if (data !== null) {
-      profile = data
-      break
-    }
-
-    // Wait 300ms before retrying (only needed on first OAuth login)
-    if (attempt < 2) {
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    }
-  }
-
-  // If profile exists and has a full_name, they've completed onboarding
-  if (profile?.full_name) {
+  if (workspace) {
     return NextResponse.redirect(`${origin}/dashboard`)
   }
 
-  // Otherwise send to create-profile (new user or incomplete profile)
   return NextResponse.redirect(`${origin}/create-profile`)
 }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { Zap, ArrowRight, Check } from 'lucide-react'
 import { saveProfile } from '@/app/actions/profile'
+import { createClient } from '@/lib/supabase/client'
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -37,6 +38,60 @@ const STEPS = [
   { id: 2, label: 'Your Workspace' },
 ]
 
+function isUrl(value: string) {
+  return value.startsWith('http://') || value.startsWith('https://')
+}
+
+/** Renders either a remote OAuth photo or an emoji avatar */
+function AvatarPreview({
+  value,
+  size = 36,
+  radius = 10,
+}: {
+  value: string
+  size?: number
+  radius?: number
+}) {
+  if (isUrl(value)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={value}
+        alt="Profile photo"
+        width={size}
+        height={size}
+        referrerPolicy="no-referrer"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: radius,
+          objectFit: 'cover',
+          flexShrink: 0,
+          border: `1px solid ${C.accentBorder}`,
+        }}
+      />
+    )
+  }
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        background: C.accentGlow,
+        border: `1px solid ${C.accentBorder}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: size * 0.55,
+        flexShrink: 0,
+      }}
+    >
+      {value}
+    </div>
+  )
+}
+
 export default function CreateProfilePage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -47,21 +102,65 @@ export default function CreateProfilePage() {
   const [selectedAvatar, setSelectedAvatar] = useState('🦊')
   const [workspaceName, setWorkspaceName] = useState('')
 
-  // Derived suggested workspace name
+  // OAuth detection
+  const [oauthPhotoUrl, setOauthPhotoUrl] = useState<string | null>(null)
+  const [avatarSource, setAvatarSource] = useState<'oauth' | 'emoji'>('emoji')
+
+  useEffect(() => {
+    async function detectOAuth() {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) return
+
+      const picture =
+        user.user_metadata?.picture ||
+        user.user_metadata?.avatar_url ||
+        null
+
+      if (picture && isUrl(picture)) {
+        setOauthPhotoUrl(picture)
+        setAvatarSource('oauth')
+        setSelectedAvatar(picture)
+      }
+
+      const name =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        ''
+      if (name) setFullName(name)
+    }
+    detectOAuth()
+  }, [])
+
+  function handleAvatarSourceChange(source: 'oauth' | 'emoji') {
+    setAvatarSource(source)
+    if (source === 'oauth' && oauthPhotoUrl) {
+      setSelectedAvatar(oauthPhotoUrl)
+    } else if (source === 'emoji') {
+      setSelectedAvatar((prev) => (isUrl(prev) ? '🦊' : prev))
+    }
+  }
+
+  function handleEmojiSelect(emoji: string) {
+    setAvatarSource('emoji')
+    setSelectedAvatar(emoji)
+  }
+
   const suggestedWorkspaceName = `${fullName.split(' ')[0] || 'My'}'s Workspace`
 
   async function handleFinish() {
     setLoading(true)
     setError('')
     try {
-      // Use whatever user typed, or fall back to the suggested name (never empty)
       const finalWorkspaceName = workspaceName.trim() || suggestedWorkspaceName
       const result = await saveProfile(fullName, selectedAvatar, finalWorkspaceName)
       if (!result.success) {
         setError(result.error)
         return
       }
-      // Hard navigation — forces middleware to re-check the now-complete profile
       window.location.href = '/dashboard'
     } catch {
       setError('Something went wrong. Please try again.')
@@ -107,7 +206,6 @@ export default function CreateProfilePage() {
         overflow: 'hidden',
       }}
     >
-      {/* Background glows */}
       <div style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', width: 700, height: 500, background: 'radial-gradient(ellipse, rgba(77,127,255,0.09) 0%, transparent 65%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '10%', left: '10%', width: 300, height: 300, background: 'radial-gradient(ellipse, rgba(77,127,255,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
@@ -212,23 +310,92 @@ export default function CreateProfilePage() {
                   />
                 </div>
 
-                {/* Avatar picker */}
+                {/* ── Avatar section ── */}
                 <div style={{ marginBottom: 28 }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: C.dim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Pick an Avatar</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: C.dim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Choose Your Avatar
+                  </label>
+
+                  {/* OAuth toggle — only when signed in via Google/GitHub */}
+                  {oauthPhotoUrl && (
+                    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 12 }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                        {/* Use Google Photo */}
+                        <button
+                          type="button"
+                          onClick={() => handleAvatarSourceChange('oauth')}
+                          style={{
+                            flex: 1, padding: '9px 12px', borderRadius: 9,
+                            border: avatarSource === 'oauth' ? `2px solid ${C.accent}` : `2px solid ${C.border}`,
+                            background: avatarSource === 'oauth' ? C.accentGlow : 'rgba(226,234,255,0.03)',
+                            color: avatarSource === 'oauth' ? C.accentLight : C.dim,
+                            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-jakarta)',
+                            cursor: 'pointer', transition: 'all 0.15s',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            boxShadow: avatarSource === 'oauth' ? '0 0 0 3px rgba(77,127,255,0.12)' : 'none',
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={oauthPhotoUrl}
+                            alt="Your Google photo"
+                            width={22}
+                            height={22}
+                            referrerPolicy="no-referrer"
+                            style={{ borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          Use Google Photo
+                          {avatarSource === 'oauth' && <Check size={12} />}
+                        </button>
+
+                        {/* Pick emoji */}
+                        <button
+                          type="button"
+                          onClick={() => handleAvatarSourceChange('emoji')}
+                          style={{
+                            flex: 1, padding: '9px 12px', borderRadius: 9,
+                            border: avatarSource === 'emoji' ? `2px solid ${C.accent}` : `2px solid ${C.border}`,
+                            background: avatarSource === 'emoji' ? C.accentGlow : 'rgba(226,234,255,0.03)',
+                            color: avatarSource === 'emoji' ? C.accentLight : C.dim,
+                            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-jakarta)',
+                            cursor: 'pointer', transition: 'all 0.15s',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            boxShadow: avatarSource === 'emoji' ? '0 0 0 3px rgba(77,127,255,0.12)' : 'none',
+                          }}
+                        >
+                          <span style={{ fontSize: 16 }}>😄</span>
+                          Pick an Emoji
+                          {avatarSource === 'emoji' && <Check size={12} />}
+                        </button>
+                      </div>
+                      <div style={{ height: 1, background: C.border, marginBottom: 12 }} />
+                    </motion.div>
+                  )}
+
+                  {/* Emoji grid */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(6, 1fr)',
+                      gap: 8,
+                      opacity: avatarSource === 'oauth' ? 0.35 : 1,
+                      pointerEvents: avatarSource === 'oauth' ? 'none' : 'auto',
+                      transition: 'opacity 0.2s',
+                    }}
+                  >
                     {AVATARS.map((emoji) => (
                       <button
                         key={emoji}
                         type="button"
-                        onClick={() => setSelectedAvatar(emoji)}
+                        onClick={() => handleEmojiSelect(emoji)}
                         style={{
                           padding: '10px 0', fontSize: 20, borderRadius: 10,
-                          border: selectedAvatar === emoji ? `2px solid ${C.accent}` : `2px solid ${C.border}`,
-                          background: selectedAvatar === emoji ? C.accentGlow : 'rgba(226,234,255,0.03)',
+                          border: avatarSource === 'emoji' && selectedAvatar === emoji ? `2px solid ${C.accent}` : `2px solid ${C.border}`,
+                          background: avatarSource === 'emoji' && selectedAvatar === emoji ? C.accentGlow : 'rgba(226,234,255,0.03)',
                           cursor: 'pointer', transition: 'all 0.15s',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          boxShadow: selectedAvatar === emoji ? `0 0 0 3px rgba(77,127,255,0.15)` : 'none',
-                          transform: selectedAvatar === emoji ? 'scale(1.08)' : 'scale(1)',
+                          boxShadow: avatarSource === 'emoji' && selectedAvatar === emoji ? `0 0 0 3px rgba(77,127,255,0.15)` : 'none',
+                          transform: avatarSource === 'emoji' && selectedAvatar === emoji ? 'scale(1.08)' : 'scale(1)',
                         }}
                       >
                         {emoji}
@@ -239,9 +406,7 @@ export default function CreateProfilePage() {
 
                 {/* Preview */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'rgba(77,127,255,0.06)', borderRadius: 10, border: `1px solid ${C.accentBorder}`, marginBottom: 24 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: C.accentGlow, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-                    {selectedAvatar}
-                  </div>
+                  <AvatarPreview value={selectedAvatar} size={36} radius={10} />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fullName || 'Your Name'}</div>
                     <div style={{ fontSize: 12, color: C.dim }}>Free plan</div>
@@ -270,16 +435,14 @@ export default function CreateProfilePage() {
 
                 {/* Profile summary */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'rgba(77,127,255,0.06)', borderRadius: 10, border: `1px solid ${C.accentBorder}`, marginBottom: 24 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: C.accentGlow, border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-                    {selectedAvatar}
-                  </div>
+                  <AvatarPreview value={selectedAvatar} size={36} radius={10} />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fullName}</div>
                     <div style={{ fontSize: 12, color: C.dim }}>Profile ready ✓</div>
                   </div>
                 </div>
 
-                {/* Workspace name — pre-filled, user can edit */}
+                {/* Workspace name */}
                 <div style={{ marginBottom: 28 }}>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: C.dim, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Workspace Name</label>
                   <input
