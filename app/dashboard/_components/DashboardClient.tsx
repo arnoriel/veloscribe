@@ -1,5 +1,8 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import WelcomeAnimation from '@/components/WelcomeAnimation'
+
 import {
   FileText,
   Plus,
@@ -356,6 +359,7 @@ interface DashboardClientProps {
   avatar: string
   workspaceName: string
   greeting: string
+  showWelcome?: boolean
 }
 
 export default function DashboardClient({
@@ -363,270 +367,292 @@ export default function DashboardClient({
   avatar,
   workspaceName,
   greeting,
+  showWelcome = false,
 }: DashboardClientProps) {
+  // ── Welcome animation state ──────────────────────────────────
+  const [showAnim, setShowAnim] = useState(showWelcome)
+
+  // Remove ?welcome=1 from URL after mount so a refresh won't replay it
+  useEffect(() => {
+    if (showWelcome) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('welcome')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [showWelcome])
+
   return (
-    <div
-      style={{
-        minHeight: '100%',
-        padding: '36px 40px 48px',
-        background: C.bg,
-        fontFamily: 'var(--font-sans)',
-        position: 'relative',
-      }}
-    >
-      {/* Ambient glows */}
+    <>
+      {showAnim && (
+        <WelcomeAnimation
+          firstName={firstName}
+          onDone={() => setShowAnim(false)}
+        />
+      )}
+
       <div
         style={{
-          position: 'fixed',
-          top: '8%',
-          right: '10%',
-          width: 480,
-          height: 380,
-          background:
-            'radial-gradient(ellipse, rgba(77,127,255,0.05) 0%, transparent 65%)',
-          pointerEvents: 'none',
-          zIndex: 0,
+          minHeight: '100%',
+          padding: '36px 40px 48px',
+          background: C.bg,
+          fontFamily: 'var(--font-sans)',
+          position: 'relative',
         }}
-      />
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '15%',
-          left: '30%',
-          width: 300,
-          height: 300,
-          background:
-            'radial-gradient(ellipse, rgba(77,127,255,0.035) 0%, transparent 70%)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-
-      <div style={{ position: 'relative', zIndex: 1 }}>
-
-        {/* ── Welcome header ───────────────────────────── */}
+      >
+        {/* Ambient glows */}
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            marginBottom: 8,
+            position: 'fixed',
+            top: '8%',
+            right: '10%',
+            width: 480,
+            height: 380,
+            background:
+              'radial-gradient(ellipse, rgba(77,127,255,0.05) 0%, transparent 65%)',
+            pointerEvents: 'none',
+            zIndex: 0,
           }}
-        >
-          <AvatarDisplay value={avatar} size={50} />
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: C.dim,
-                letterSpacing: '0.09em',
-                textTransform: 'uppercase',
-                marginBottom: 4,
-              }}
-            >
-              {workspaceName}
-            </div>
-            <h1
-              style={{
-                fontSize: 26,
-                fontWeight: 800,
-                color: C.text,
-                letterSpacing: '-0.03em',
-                margin: 0,
-                lineHeight: 1.15,
-              }}
-            >
-              {greeting},{' '}
-              <span
+        />
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '15%',
+            left: '30%',
+            width: 300,
+            height: 300,
+            background:
+              'radial-gradient(ellipse, rgba(77,127,255,0.035) 0%, transparent 70%)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+
+          {/* ── Welcome header ───────────────────────────── */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              marginBottom: 8,
+            }}
+          >
+            <AvatarDisplay value={avatar} size={50} />
+            <div>
+              <div
                 style={{
-                  background:
-                    'linear-gradient(120deg, #4d7fff 0%, #a5c0ff 50%, #4d7fff 100%)',
-                  backgroundSize: '200% 200%',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.dim,
+                  letterSpacing: '0.09em',
+                  textTransform: 'uppercase',
+                  marginBottom: 4,
                 }}
               >
-                {firstName}
-              </span>{' '}
-              👋
-            </h1>
+                {workspaceName}
+              </div>
+              <h1
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: C.text,
+                  letterSpacing: '-0.03em',
+                  margin: 0,
+                  lineHeight: 1.15,
+                }}
+              >
+                {greeting},{' '}
+                <span
+                  style={{
+                    background:
+                      'linear-gradient(120deg, #4d7fff 0%, #a5c0ff 50%, #4d7fff 100%)',
+                    backgroundSize: '200% 200%',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  {firstName}
+                </span>{' '}
+                👋
+              </h1>
+            </div>
           </div>
-        </div>
 
-        <p
-          style={{
-            fontSize: 13,
-            color: C.muted,
-            lineHeight: 1.65,
-            maxWidth: 480,
-            margin: '0 0 32px 0',
-            paddingLeft: 66,
-          }}
-        >
-          Your AI-powered writing workspace is ready — create your first page
-          and let the words flow.
-        </p>
+          <p
+            style={{
+              fontSize: 13,
+              color: C.muted,
+              lineHeight: 1.65,
+              maxWidth: 480,
+              margin: '0 0 32px 0',
+              paddingLeft: 66,
+            }}
+          >
+            Your AI-powered writing workspace is ready — create your first page
+            and let the words flow.
+          </p>
 
-        {/* ── Stats row ────────────────────────────────── */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 14,
-            marginBottom: 32,
-          }}
-        >
-          <StatCard
-            icon={<FileText size={13} />}
-            label="Pages"
-            value="0"
-            sub="Create your first page"
-          />
-          <StatCard
-            icon={<Zap size={13} />}
-            label="Words Written"
-            value="0"
-            sub="Start writing to track"
-          />
-          <StatCard
-            icon={<Star size={13} />}
-            label="AI Assists"
-            value="0"
-            sub="Use AI to write faster"
-          />
-        </div>
-
-        {/* ── Quick actions ─────────────────────────────── */}
-        <div style={{ marginBottom: 32 }}>
-          <SectionLabel>Quick Actions</SectionLabel>
+          {/* ── Stats row ────────────────────────────────── */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 10,
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 14,
+              marginBottom: 32,
             }}
           >
-            <QuickActionCard
-              icon={<Plus size={15} />}
-              label="New Page"
-              desc="Start writing a blank page"
-              accent
+            <StatCard
+              icon={<FileText size={13} />}
+              label="Pages"
+              value="0"
+              sub="Create your first page"
             />
-            <QuickActionCard
-              icon={<Sparkles size={15} />}
-              label="AI Write"
-              desc="Generate a page from a prompt"
+            <StatCard
+              icon={<Zap size={13} />}
+              label="Words Written"
+              value="0"
+              sub="Start writing to track"
             />
-            <QuickActionCard
-              icon={<BookOpen size={15} />}
-              label="Templates"
-              desc="Start from a pre-built template"
-            />
-            <QuickActionCard
-              icon={<Clock size={15} />}
-              label="Import"
-              desc="Import from Notion or Markdown"
+            <StatCard
+              icon={<Star size={13} />}
+              label="AI Assists"
+              value="0"
+              sub="Use AI to write faster"
             />
           </div>
-        </div>
 
-        {/* ── Recent pages ──────────────────────────────── */}
-        <div style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 14,
-            }}
-          >
-            <SectionLabel>Recent Pages</SectionLabel>
-            <button
-              style={{
-                fontSize: 12,
-                color: C.accentLight,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: 0,
-                opacity: 0.8,
-                transition: 'opacity 0.15s',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.8' }}
-            >
-              View all <ArrowRight size={11} />
-            </button>
-          </div>
-          <EmptyRecentDocs />
-        </div>
-
-        {/* ── Tip strip ─────────────────────────────────── */}
-        <div
-          style={{
-            padding: '14px 18px',
-            background: 'rgba(77,127,255,0.05)',
-            border: `1px solid rgba(77,127,255,0.16)`,
-            borderRadius: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 9,
-              flexShrink: 0,
-              background: 'linear-gradient(135deg, #3b6ef0 0%, #5d8aff 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 3px 10px rgba(77,127,255,0.35)',
-            }}
-          >
-            <Zap size={14} color="#fff" />
-          </div>
-          <div>
+          {/* ── Quick actions ─────────────────────────────── */}
+          <div style={{ marginBottom: 32 }}>
+            <SectionLabel>Quick Actions</SectionLabel>
             <div
               style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: C.text,
-                marginBottom: 2,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 10,
               }}
             >
-              Tip: Try the AI assistant
-            </div>
-            <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
-              Select any text in a page and press{' '}
-              <span
-                style={{
-                  background: 'rgba(77,127,255,0.14)',
-                  border: '1px solid rgba(77,127,255,0.28)',
-                  borderRadius: 4,
-                  padding: '1px 6px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: C.accentLight,
-                }}
-              >
-                ⌘ K
-              </span>{' '}
-              to open the AI command menu.
+              <QuickActionCard
+                icon={<Plus size={15} />}
+                label="New Page"
+                desc="Start writing a blank page"
+                accent
+              />
+              <QuickActionCard
+                icon={<Sparkles size={15} />}
+                label="AI Write"
+                desc="Generate a page from a prompt"
+              />
+              <QuickActionCard
+                icon={<BookOpen size={15} />}
+                label="Templates"
+                desc="Start from a pre-built template"
+              />
+              <QuickActionCard
+                icon={<Clock size={15} />}
+                label="Import"
+                desc="Import from Notion or Markdown"
+              />
             </div>
           </div>
-        </div>
 
+          {/* ── Recent pages ──────────────────────────────── */}
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
+              <SectionLabel>Recent Pages</SectionLabel>
+              <button
+                style={{
+                  fontSize: 12,
+                  color: C.accentLight,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: 0,
+                  opacity: 0.8,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.8' }}
+              >
+                View all <ArrowRight size={11} />
+              </button>
+            </div>
+            <EmptyRecentDocs />
+          </div>
+
+          {/* ── Tip strip ─────────────────────────────────── */}
+          <div
+            style={{
+              padding: '14px 18px',
+              background: 'rgba(77,127,255,0.05)',
+              border: `1px solid rgba(77,127,255,0.16)`,
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 9,
+                flexShrink: 0,
+                background: 'linear-gradient(135deg, #3b6ef0 0%, #5d8aff 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 3px 10px rgba(77,127,255,0.35)',
+              }}
+            >
+              <Zap size={14} color="#fff" />
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: C.text,
+                  marginBottom: 2,
+                }}
+              >
+                Tip: Try the AI assistant
+              </div>
+              <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
+                Select any text in a page and press{' '}
+                <span
+                  style={{
+                    background: 'rgba(77,127,255,0.14)',
+                    border: '1px solid rgba(77,127,255,0.28)',
+                    borderRadius: 4,
+                    padding: '1px 6px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: C.accentLight,
+                  }}
+                >
+                  ⌘ K
+                </span>{' '}
+                to open the AI command menu.
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -161,7 +161,7 @@ export default function CreateProfilePage() {
         setError(result.error)
         return
       }
-      window.location.href = '/dashboard'
+      window.location.href = '/dashboard?welcome=1'
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
