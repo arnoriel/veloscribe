@@ -25,15 +25,43 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Kalau belum login dan coba akses /dashboard → redirect ke /login
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  const { pathname } = request.nextUrl
+
+  // ── Not authenticated ──────────────────────────────────────
+  if (!user) {
+    // Protect dashboard and create-profile
+    if (pathname.startsWith('/dashboard') || pathname === '/create-profile') {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return supabaseResponse
   }
 
-  // Kalau sudah login dan masih di /login → redirect ke /dashboard
-  if (user && request.nextUrl.pathname === '/login') {
+  // ── Authenticated — check profile completion ───────────────
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const profileComplete = !!(profile?.full_name)
+
+  // Already logged in → don't let them stay on /login
+  if (pathname === '/login') {
+    const dest = profileComplete ? '/dashboard' : '/create-profile'
+    return NextResponse.redirect(new URL(dest, request.url))
+  }
+
+  // Trying to access dashboard but no profile yet → must complete profile first
+  if (pathname.startsWith('/dashboard') && !profileComplete) {
+    return NextResponse.redirect(new URL('/create-profile', request.url))
+  }
+
+  // Trying to access create-profile but profile already done → go to dashboard
+  if (pathname === '/create-profile' && profileComplete) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
@@ -41,5 +69,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/login', '/create-profile'],
 }

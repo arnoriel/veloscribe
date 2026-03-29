@@ -216,12 +216,6 @@ const features = [
     desc: "Highlight text, pick an action — AI instantly improves phrasing, shifts tone, or continues your draft without ever leaving the editor.",
   },
   {
-    icon: Layers,
-    tag: "Block Editor",
-    title: "A flexible, free-form block editor",
-    desc: "Paragraphs, headings, checklists, images, code — arrange everything with drag-and-drop as effortlessly as thinking.",
-  },
-  {
     icon: FileText,
     tag: "Smart Workspace",
     title: "An organised workspace with no limits",

@@ -1,20 +1,39 @@
 import { createClient } from '@/lib/supabase/server'
+import DashboardClient from './_components/DashboardClient'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', user?.id ?? '')
+    .maybeSingle()
+
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('name')
+    .eq('owner_id', user?.id ?? '')
+    .limit(1)
+    .maybeSingle()
+
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'there'
+  const avatar = profile?.avatar_url ?? '🦊'
+  const workspaceName = workspace?.name ?? 'My Workspace'
+
+  const hour = new Date().getHours()
+  const greeting =
+    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <p className="text-4xl mb-4">👋</p>
-        <h1 className="text-2xl font-bold text-white">
-          Welcome, {(user?.user_metadata?.full_name ?? user?.user_metadata?.name)?.split(' ')[0] ?? 'there'}
-        </h1>
-        <p className="text-neutral-400 mt-2 text-sm">
-          Select a page from the sidebar, or create a new one.
-        </p>
-      </div>
-    </div>
+    <DashboardClient
+      firstName={firstName}
+      avatar={avatar}
+      workspaceName={workspaceName}
+      greeting={greeting}
+    />
   )
 }

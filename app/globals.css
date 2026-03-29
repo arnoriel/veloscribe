@@ -48,7 +48,21 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── VeloScribe Design Tokens ─────────────────────────────── */
 :root {
+  --vs-bg: #06091A;
+  --vs-bg-card: #0C1428;
+  --vs-bg-sidebar: #070B1D;
+  --vs-accent: #4D7FFF;
+  --vs-accent-light: #7AA3FF;
+  --vs-accent-glow: rgba(77, 127, 255, 0.15);
+  --vs-accent-border: rgba(77, 127, 255, 0.25);
+  --vs-text: #E2EAFF;
+  --vs-muted: rgba(226, 234, 255, 0.5);
+  --vs-dim: rgba(226, 234, 255, 0.28);
+  --vs-border: rgba(226, 234, 255, 0.07);
+  --vs-border-strong: rgba(226, 234, 255, 0.12);
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -127,4 +141,112 @@
   html {
     @apply font-sans;
   }
+}
+
+.vs-btn-primary {
+  background: linear-gradient(135deg, #3b6ef0 0%, #5d8aff 100%);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(77, 127, 255, 0.35);
+  transition: box-shadow 0.2s;
+}
+
+.vs-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 28px rgba(77, 127, 255, 0.55);
+}
+
+.vs-input {
+  color: #E2EAFF;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(226, 234, 255, 0.12);
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.vs-input:focus {
+  border-color: #4D7FFF;
+  background-color: rgba(77, 127, 255, 0.05);
+  box-shadow: 0 0 0 4px rgba(77, 127, 255, 0.15);
+}
+
+/* ── Custom Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(77, 127, 255, 0.18);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 127, 255, 0.35);
+}
+
+/* ── Keyframes ────────────────────────────────────────────── */
+@keyframes vs-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes vs-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes vs-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(77, 127, 255, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(77, 127, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(77, 127, 255, 0); }
+}
+
+/* ── VeloScribe Utility Classes ───────────────────────────── */
+.vs-bg {
+  background: var(--vs-bg);
+  color: var(--vs-text);
+}
+
+.vs-gradient-text {
+  background: linear-gradient(120deg, #4d7fff 0%, #a5c0ff 45%, #4d7fff 80%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vs-shimmer 4s ease infinite;
+}
+
+.vs-btn-primary {
+  background: linear-gradient(135deg, #3b6ef0 0%, #5d8aff 100%);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 6px 24px rgba(77, 127, 255, 0.35);
+}
+.vs-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 32px rgba(77, 127, 255, 0.5);
+}
+.vs-btn-primary:active {
+  transform: translateY(0);
+}
+
+.vs-input {
+  background: rgba(10, 14, 38, 0.8);
+  border: 1px solid rgba(226, 234, 255, 0.1);
+  border-radius: 10px;
+  color: var(--vs-text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+.vs-input::placeholder {
+  color: rgba(226, 234, 255, 0.3);
+}
+.vs-input:focus {
+  border-color: rgba(77, 127, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(77, 127, 255, 0.1);
 }
