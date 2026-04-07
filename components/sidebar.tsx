@@ -1,6 +1,7 @@
 'use client'
 
 import { signOut } from '@/app/actions/auth'
+import { createPage } from '@/app/actions/pages'
 import {
   FileText,
   Plus,
@@ -11,7 +12,9 @@ import {
   ChevronDown,
   Home,
 } from 'lucide-react'
-import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 
 const C = {
   bg: '#070B1D',
@@ -31,64 +34,105 @@ function isUrl(value: string) {
   return value.startsWith('http://') || value.startsWith('https://')
 }
 
+export interface SidebarPage {
+  id: string
+  title: string
+  emoji: string
+}
+
 interface SidebarProps {
   userFullName: string
   userAvatar: string
   workspaceName: string
+  workspaceId: string
+  pages: SidebarPage[]
 }
+
+// ─── Nav item ─────────────────────────────────────────────────────────────
 
 function NavItem({
   icon,
   label,
+  href,
   active = false,
 }: {
   icon: React.ReactNode
   label: string
+  href?: string
   active?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
-  return (
-    <button
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 9,
-        padding: '7px 10px',
-        borderRadius: 8,
-        background: active ? C.bgActive : hovered ? C.bgHover : 'transparent',
-        border: active ? `1px solid ${C.accentBorder}` : '1px solid transparent',
-        color: active ? C.accentLight : hovered ? C.muted : C.dim,
-        fontSize: 13,
-        fontWeight: active ? 600 : 500,
-        cursor: 'pointer',
-        transition: 'all 0.15s',
-        textAlign: 'left',
-        fontFamily: 'inherit',
-      }}
-    >
+
+  const style: React.CSSProperties = {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    padding: '7px 10px',
+    borderRadius: 8,
+    background: active ? C.bgActive : hovered ? C.bgHover : 'transparent',
+    border: active ? `1px solid ${C.accentBorder}` : '1px solid transparent',
+    color: active ? C.accentLight : hovered ? C.muted : C.dim,
+    fontSize: 13,
+    fontWeight: active ? 600 : 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    textDecoration: 'none',
+  }
+
+  const content = (
+    <>
       <span style={{ opacity: active ? 1 : 0.65, display: 'flex', alignItems: 'center' }}>
         {icon}
       </span>
       {label}
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        style={style}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <button
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ ...style, border: active ? `1px solid ${C.accentBorder}` : '1px solid transparent' }}
+    >
+      {content}
     </button>
   )
 }
 
+// ─── Page item in sidebar ─────────────────────────────────────────────────
+
 function PageItem({
+  id,
   label,
-  active = false,
   emoji,
+  active = false,
 }: {
+  id: string
   label: string
-  active?: boolean
   emoji?: string
+  active?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
+
   return (
-    <div
+    <Link
+      href={`/dashboard/${id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -105,6 +149,7 @@ function PageItem({
         cursor: 'pointer',
         transition: 'all 0.15s',
         userSelect: 'none',
+        textDecoration: 'none',
       }}
     >
       {emoji ? (
@@ -112,20 +157,26 @@ function PageItem({
       ) : (
         <FileText size={13} style={{ opacity: 0.55, flexShrink: 0 }} />
       )}
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-        {label}
+      <span
+        style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          flex: 1,
+        }}
+      >
+        {label || 'Untitled'}
       </span>
-    </div>
+    </Link>
   )
 }
 
-/** Renders a URL-based photo or an emoji/text avatar in the sidebar user chip */
-function AvatarChip({ value, size = 26 }: { value: string; size?: number }) {
-  const borderRadius = 8
+// ─── Avatar chip ─────────────────────────────────────────────────────────
 
+function AvatarChip({ value, size = 26 }: { value: string; size?: number }) {
   if (isUrl(value)) {
+    // eslint-disable-next-line @next/next/no-img-element
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={value}
         alt="Profile photo"
@@ -135,7 +186,7 @@ function AvatarChip({ value, size = 26 }: { value: string; size?: number }) {
         style={{
           width: size,
           height: size,
-          borderRadius,
+          borderRadius: 8,
           objectFit: 'cover',
           flexShrink: 0,
           border: '1px solid rgba(77,127,255,0.24)',
@@ -143,13 +194,12 @@ function AvatarChip({ value, size = 26 }: { value: string; size?: number }) {
       />
     )
   }
-
   return (
     <div
       style={{
         width: size,
         height: size,
-        borderRadius,
+        borderRadius: 8,
         background: 'rgba(77,127,255,0.14)',
         border: '1px solid rgba(77,127,255,0.24)',
         display: 'flex',
@@ -165,7 +215,8 @@ function AvatarChip({ value, size = 26 }: { value: string; size?: number }) {
   )
 }
 
-/** Logout confirmation modal */
+// ─── Logout modal ─────────────────────────────────────────────────────────
+
 function LogoutModal({
   onConfirm,
   onCancel,
@@ -207,7 +258,6 @@ function LogoutModal({
           flexDirection: 'column',
         }}
       >
-        {/* Icon */}
         <div
           style={{
             width: 44,
@@ -223,58 +273,20 @@ function LogoutModal({
         >
           <LogOut size={20} color="#f87171" />
         </div>
-
-        {/* Title */}
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            color: C.text,
-            marginBottom: 8,
-            letterSpacing: '-0.01em',
-          }}
-        >
+        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8, letterSpacing: '-0.01em' }}>
           Sign out?
         </div>
-
-        {/* Body */}
-        <div
-          style={{
-            fontSize: 13,
-            color: C.muted,
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}
-        >
-          You&apos;ll be redirected to the login page. Any unsaved changes will be lost.
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, marginBottom: 24 }}>
+          You&apos;ll be redirected to the login page.
         </div>
-
-        {/* Actions */}
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={onCancel}
             style={{
-              flex: 1,
-              padding: '9px 0',
-              borderRadius: 9,
-              background: 'rgba(226,234,255,0.05)',
-              border: '1px solid rgba(226,234,255,0.10)',
-              color: C.muted,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.background = 'rgba(226,234,255,0.09)'
-              el.style.color = C.text
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.background = 'rgba(226,234,255,0.05)'
-              el.style.color = C.muted
+              flex: 1, padding: '9px 0', borderRadius: 9,
+              background: 'rgba(226,234,255,0.05)', border: '1px solid rgba(226,234,255,0.10)',
+              color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              transition: 'all 0.15s', fontFamily: 'inherit',
             }}
           >
             Cancel
@@ -282,35 +294,14 @@ function LogoutModal({
           <button
             onClick={onConfirm}
             style={{
-              flex: 1,
-              padding: '9px 0',
-              borderRadius: 9,
-              background: 'rgba(239,68,68,0.12)',
-              border: '1px solid rgba(239,68,68,0.24)',
-              color: '#f87171',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              fontFamily: 'inherit',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.background = 'rgba(239,68,68,0.20)'
-              el.style.borderColor = 'rgba(239,68,68,0.38)'
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.background = 'rgba(239,68,68,0.12)'
-              el.style.borderColor = 'rgba(239,68,68,0.24)'
+              flex: 1, padding: '9px 0', borderRadius: 9,
+              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.24)',
+              color: '#f87171', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.15s', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
-            <LogOut size={13} />
-            Sign Out
+            <LogOut size={13} /> Sign Out
           </button>
         </div>
       </div>
@@ -318,14 +309,33 @@ function LogoutModal({
   )
 }
 
-export default function Sidebar({ userFullName, userAvatar, workspaceName }: SidebarProps) {
+// ─── Main sidebar ─────────────────────────────────────────────────────────
+
+export default function Sidebar({
+  userFullName,
+  userAvatar,
+  workspaceName,
+  workspaceId,
+  pages,
+}: SidebarProps) {
+  const pathname = usePathname()
+  const router = useRouter()
   const [wsOpen, setWsOpen] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const firstName = userFullName.split(' ')[0] || 'User'
+
+  const isHome = pathname === '/dashboard'
 
   async function handleConfirmLogout() {
     setShowLogoutModal(false)
     await signOut()
+  }
+
+  function handleNewPage() {
+    startTransition(async () => {
+      await createPage(workspaceId)
+    })
   }
 
   return (
@@ -349,22 +359,15 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
           userSelect: 'none',
         }}
       >
-        {/* ── Workspace header ─────────────────────── */}
+        {/* ── Workspace header ───────────────────────────────────── */}
         <div style={{ padding: '12px 8px 8px', borderBottom: `1px solid ${C.border}` }}>
           <button
             onClick={() => setWsOpen(!wsOpen)}
             style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              padding: '7px 10px',
-              borderRadius: 9,
-              background: 'transparent',
-              border: '1px solid transparent',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              fontFamily: 'inherit',
+              width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+              padding: '7px 10px', borderRadius: 9,
+              background: 'transparent', border: '1px solid transparent',
+              cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLButtonElement
@@ -379,14 +382,9 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
           >
             <div
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: 7,
+                width: 24, height: 24, borderRadius: 7, flexShrink: 0,
                 background: 'linear-gradient(135deg, #3b6ef0 0%, #5d8aff 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 3px 10px rgba(77,127,255,0.38)',
               }}
             >
@@ -394,15 +392,9 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
             </div>
             <span
               style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: C.text,
-                flex: 1,
-                textAlign: 'left',
-                letterSpacing: '-0.01em',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                fontSize: 13, fontWeight: 700, color: C.text,
+                flex: 1, textAlign: 'left', letterSpacing: '-0.01em',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}
             >
               {workspaceName}
@@ -419,51 +411,47 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
           </button>
         </div>
 
-        {/* ── Nav items ───────────────────────────── */}
+        {/* ── Nav items ──────────────────────────────────────────── */}
         <div style={{ padding: '8px 8px 4px' }}>
           <NavItem icon={<Search size={14} />} label="Search" />
-          <NavItem icon={<Home size={14} />} label="Home" active />
+          <NavItem
+            icon={<Home size={14} />}
+            label="Home"
+            href="/dashboard"
+            active={isHome}
+          />
           <NavItem icon={<Settings size={14} />} label="Settings" />
         </div>
 
         <div style={{ height: 1, background: C.border, margin: '2px 12px 4px' }} />
 
-        {/* ── Pages ───────────────────────────────── */}
+        {/* ── Pages list ─────────────────────────────────────────── */}
         <div style={{ flex: 1, padding: '4px 8px', overflow: 'auto', minHeight: 0 }}>
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '6px 10px',
-              marginBottom: 2,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '6px 10px', marginBottom: 2,
             }}
           >
             <span
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'rgba(226,234,255,0.18)',
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+                textTransform: 'uppercase', color: 'rgba(226,234,255,0.18)',
               }}
             >
               Pages
             </span>
             <button
+              onClick={handleNewPage}
+              disabled={isPending}
+              title="New page"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 18,
-                height: 18,
-                borderRadius: 5,
-                background: 'transparent',
-                border: 'none',
-                color: C.dim,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 18, height: 18, borderRadius: 5,
+                background: 'transparent', border: 'none',
+                color: C.dim, cursor: isPending ? 'default' : 'pointer',
+                transition: 'all 0.15s', padding: 0,
+                opacity: isPending ? 0.4 : 1,
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLButtonElement
@@ -480,23 +468,45 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
             </button>
           </div>
 
-          <PageItem label="Getting Started" emoji="🚀" active />
-          <PageItem label="My Notes" emoji="📝" />
-          <PageItem label="Projects" emoji="🗂️" />
+          {/* Dynamic pages from Supabase */}
+          {pages.length === 0 ? (
+            <div
+              style={{
+                padding: '10px 10px',
+                fontSize: 12,
+                color: 'rgba(226,234,255,0.18)',
+                fontStyle: 'italic',
+              }}
+            >
+              No pages yet
+            </div>
+          ) : (
+            pages.map((page) => (
+              <PageItem
+                key={page.id}
+                id={page.id}
+                label={page.title}
+                emoji={page.emoji}
+                active={pathname === `/dashboard/${page.id}`}
+              />
+            ))
+          )}
 
-          {/* New page hint */}
+          {/* New page hint button */}
           <div
+            onClick={handleNewPage}
             style={{
               margin: '10px 2px 0',
               padding: '8px 10px',
               borderRadius: 8,
               border: `1px dashed rgba(77,127,255,0.15)`,
               background: 'transparent',
-              cursor: 'pointer',
+              cursor: isPending ? 'default' : 'pointer',
               transition: 'all 0.15s',
               display: 'flex',
               alignItems: 'center',
               gap: 7,
+              opacity: isPending ? 0.5 : 1,
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLDivElement
@@ -510,37 +520,27 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
             }}
           >
             <Plus size={12} color={C.accentLight} style={{ opacity: 0.6 }} />
-            <span style={{ fontSize: 12, color: C.dim, fontWeight: 500 }}>New page</span>
+            <span style={{ fontSize: 12, color: C.dim, fontWeight: 500 }}>
+              {isPending ? 'Creating…' : 'New page'}
+            </span>
           </div>
         </div>
 
-        {/* ── User + Sign out ─────────────────────── */}
+        {/* ── User + Sign out ────────────────────────────────────── */}
         <div style={{ padding: '8px', borderTop: `1px solid ${C.border}` }}>
-          {/* User chip */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              padding: '8px 10px',
-              borderRadius: 9,
-              marginBottom: 2,
-              background: 'rgba(77,127,255,0.05)',
-              border: `1px solid rgba(77,127,255,0.10)`,
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 10px', borderRadius: 9, marginBottom: 2,
+              background: 'rgba(77,127,255,0.05)', border: `1px solid rgba(77,127,255,0.10)`,
             }}
           >
-            {/* ✅ Avatar: renders <img> if URL, fallback emoji/text div otherwise */}
             <AvatarChip value={userAvatar} size={26} />
-
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: C.text,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  fontSize: 12, fontWeight: 700, color: C.text,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   lineHeight: 1.3,
                 }}
               >
@@ -550,26 +550,16 @@ export default function Sidebar({ userFullName, userAvatar, workspaceName }: Sid
             </div>
           </div>
 
-          {/* Sign out — now opens confirmation modal instead of directly submitting */}
           <button
             type="button"
             onClick={() => setShowLogoutModal(true)}
             style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              padding: '7px 10px',
-              borderRadius: 8,
-              background: 'transparent',
-              border: '1px solid transparent',
-              color: C.dim,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              textAlign: 'left',
-              fontFamily: 'inherit',
+              width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+              padding: '7px 10px', borderRadius: 8,
+              background: 'transparent', border: '1px solid transparent',
+              color: C.dim, fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', transition: 'all 0.15s',
+              textAlign: 'left', fontFamily: 'inherit',
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLButtonElement

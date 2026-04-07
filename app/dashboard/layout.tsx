@@ -1,5 +1,6 @@
 import Sidebar from '@/components/sidebar'
 import { createClient } from '@/lib/supabase/server'
+import { getPages } from '@/app/actions/pages'
 
 export default async function DashboardLayout({
   children,
@@ -19,10 +20,13 @@ export default async function DashboardLayout({
 
   const { data: workspace } = await supabase
     .from('workspaces')
-    .select('name')
+    .select('id, name')
     .eq('owner_id', user?.id ?? '')
     .limit(1)
     .maybeSingle()
+
+  // Fetch all pages for this workspace to populate the sidebar
+  const pages = workspace?.id ? await getPages(workspace.id) : []
 
   return (
     <div
@@ -38,6 +42,12 @@ export default async function DashboardLayout({
         userFullName={profile?.full_name ?? 'User'}
         userAvatar={profile?.avatar_url ?? '🦊'}
         workspaceName={workspace?.name ?? 'My Workspace'}
+        workspaceId={workspace?.id ?? ''}
+        pages={pages.map((p) => ({
+          id: p.id,
+          title: p.title,
+          emoji: p.emoji,
+        }))}
       />
       <main
         style={{

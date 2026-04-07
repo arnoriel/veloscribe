@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './_components/DashboardClient'
+import { getPages } from '@/app/actions/pages'
 
 export default async function DashboardPage({
   searchParams,
@@ -19,7 +20,7 @@ export default async function DashboardPage({
 
   const { data: workspace } = await supabase
     .from('workspaces')
-    .select('name')
+    .select('id, name')
     .eq('owner_id', user?.id ?? '')
     .limit(1)
     .maybeSingle()
@@ -27,12 +28,16 @@ export default async function DashboardPage({
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there'
   const avatar = profile?.avatar_url ?? '🦊'
   const workspaceName = workspace?.name ?? 'My Workspace'
+  const workspaceId = workspace?.id ?? ''
 
   const hour = new Date().getHours()
   const greeting =
     hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  // Only show welcome animation for brand-new users arriving from create-profile
+  // Get page count for the stats card
+  const pages = workspaceId ? await getPages(workspaceId) : []
+  const pageCount = pages.length
+
   const params = await searchParams
   const showWelcome = params?.welcome === '1'
 
@@ -43,6 +48,9 @@ export default async function DashboardPage({
       workspaceName={workspaceName}
       greeting={greeting}
       showWelcome={showWelcome}
+      workspaceId={workspaceId}
+      pageCount={pageCount}
+      pages={pages}
     />
   )
 }
