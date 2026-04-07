@@ -14,16 +14,19 @@ export interface Page {
   content: object | null
   created_at: string
   updated_at: string
+  is_deleted: boolean
+  deleted_at: string | null
 }
 
-// ─── Get all pages for a workspace ─────────────────────────────────────────
+// ─── Get all ACTIVE pages for a workspace ──────────────────────────────────
 
 export async function getPages(workspaceId: string): Promise<Page[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('pages')
-    .select('id, workspace_id, title, emoji, content, created_at, updated_at')
+    .select('id, workspace_id, title, emoji, content, created_at, updated_at, is_deleted, deleted_at')
     .eq('workspace_id', workspaceId)
+    .eq('is_deleted', false)
     .order('updated_at', { ascending: false })
 
   if (error) {
@@ -33,14 +36,33 @@ export async function getPages(workspaceId: string): Promise<Page[]> {
   return (data ?? []) as Page[]
 }
 
-// ─── Get a single page ──────────────────────────────────────────────────────
+// ─── Get all TRASHED pages for a workspace ─────────────────────────────────
+
+export async function getTrashPages(workspaceId: string): Promise<Page[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('pages')
+    .select('id, workspace_id, title, emoji, content, created_at, updated_at, is_deleted, deleted_at')
+    .eq('workspace_id', workspaceId)
+    .eq('is_deleted', true)
+    .order('deleted_at', { ascending: false })
+
+  if (error) {
+    console.error('[getTrashPages] error:', error)
+    return []
+  }
+  return (data ?? []) as Page[]
+}
+
+// ─── Get a single ACTIVE page ───────────────────────────────────────────────
 
 export async function getPage(pageId: string): Promise<Page | null> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('pages')
-    .select('id, workspace_id, title, emoji, content, created_at, updated_at')
+    .select('id, workspace_id, title, emoji, content, created_at, updated_at, is_deleted, deleted_at')
     .eq('id', pageId)
+    .eq('is_deleted', false)
     .maybeSingle()
 
   if (error) {
@@ -97,15 +119,12 @@ export async function updatePageContent(
       updated_at: new Date().toISOString(),
     })
     .eq('id', pageId)
+    .eq('is_deleted', false)
 
   if (error) {
     console.error('[updatePageContent] error:', error)
     throw new Error('Failed to save page')
   }
-
-  // We do NOT revalidatePath here on purpose — the editor handles
-  // optimistic local state, and we don't want a full server re-render
-  // on every keystroke save.
 }
 
 // ─── Update page title only ─────────────────────────────────────────────────
@@ -121,6 +140,7 @@ export async function updatePageTitle(pageId: string, title: string, emoji?: str
       updated_at: new Date().toISOString(),
     })
     .eq('id', pageId)
+    .eq('is_deleted', false)
 
   if (error) {
     console.error('[updatePageTitle] error:', error)
@@ -130,7 +150,73 @@ export async function updatePageTitle(pageId: string, title: string, emoji?: str
   revalidatePath('/dashboard')
 }
 
-// ─── Delete a page ──────────────────────────────────────────────────────────
+// ─── Soft delete a page (moves to trash) ───────────────────────────────────
+
+export async function softDeletePage(pageId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('pages')
+    .update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq('id', pageId)
+    .eq('is_deleted', false)
+
+  if (error) {
+    console.error('[softDeletePage] error:', error)
+    throw new Error('Failed to move page to trash')
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/trash')
+}
+
+// ─── Restore a page from trash ─────────────────────────────────────────────
+
+export async function restorePage(pageId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('pages')
+    .update({
+      is_deleted: false,
+      deleted_at: null,
+    })
+    .eq('id', pageId)
+    .eq('is_deleted', true)
+
+  if (error) {
+    console.error('[restorePage] error:', error)
+    throw new Error('Failed to restore page')
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/trash')
+}
+
+// ─── Permanently delete a page (hard delete, no recovery) ──────────────────
+
+export async function permanentDeletePage(pageId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('pages')
+    .delete()
+    .eq('id', pageId)
+    .eq('is_deleted', true) // safety: only delete pages already in trash
+
+  if (error) {
+    console.error('[permanentDeletePage] error:', error)
+    throw new Error('Failed to permanently delete page')
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/trash')
+}
+
+// ─── Legacy hard delete (kept for internal use / compatibility) ─────────────
 
 export async function deletePage(pageId: string) {
   const supabase = await createClient()

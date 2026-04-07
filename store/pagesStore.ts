@@ -10,6 +10,7 @@ interface PagesStore {
   pages: SidebarPage[]
   setPages: (pages: SidebarPage[]) => void
   updatePageMeta: (id: string, title: string, emoji: string) => void
+  removePage: (id: string) => void
   savingPageId: string | null
   setSavingPageId: (id: string | null) => void
 }
@@ -22,6 +23,10 @@ export const usePagesStore = create<PagesStore>((set) => ({
       pages: state.pages.map((p) =>
         p.id === id ? { ...p, title, emoji } : p
       ),
+    })),
+  removePage: (id) =>
+    set((state) => ({
+      pages: state.pages.filter((p) => p.id !== id),
     })),
   savingPageId: null,
   setSavingPageId: (id) => set({ savingPageId: id }),

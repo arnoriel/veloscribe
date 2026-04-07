@@ -1,7 +1,8 @@
 'use client'
 
 import { signOut } from '@/app/actions/auth'
-import { createPage } from '@/app/actions/pages'
+import { createPage, softDeletePage } from '@/app/actions/pages'
+import DeletePageModal from '@/components/DeletePageModal'
 import {
   FileText,
   Plus,
@@ -11,6 +12,7 @@ import {
   Zap,
   ChevronDown,
   Home,
+  Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -116,7 +118,7 @@ function NavItem({
   )
 }
 
-// ─── Page item in sidebar ─────────────────────────────────────────────────
+// ─── Page item in sidebar (with delete on hover) ──────────────────────────
 
 function PageItem({
   id,
@@ -124,73 +126,118 @@ function PageItem({
   emoji,
   active = false,
   isSaving = false,
+  onDeleteClick,
 }: {
   id: string
   label: string
   emoji?: string
   active?: boolean
   isSaving?: boolean
+  onDeleteClick: (id: string, title: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const [trashHovered, setTrashHovered] = useState(false)
 
   return (
-    <Link
-      href={`/dashboard/${id}`}
+    <div
+      style={{ position: 'relative' }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '6px 10px',
-        borderRadius: 7,
-        background: active ? C.bgActive : hovered ? C.bgHover : 'transparent',
-        border: active ? `1px solid ${C.accentBorder}` : '1px solid transparent',
-        color: active ? C.text : hovered ? C.muted : C.dim,
-        fontSize: 13,
-        fontWeight: active ? 600 : 400,
-        cursor: 'pointer',
-        transition: 'all 0.15s',
-        userSelect: 'none',
-        textDecoration: 'none',
+      onMouseLeave={() => {
+        setHovered(false)
+        setTrashHovered(false)
       }}
     >
-      {emoji ? (
-        <span style={{ fontSize: 13, flexShrink: 0, lineHeight: 1 }}>{emoji}</span>
-      ) : (
-        <FileText size={13} style={{ opacity: 0.55, flexShrink: 0 }} />
-      )}
-      <span
+      <Link
+        href={`/dashboard/${id}`}
         style={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 32px 6px 10px',
+          borderRadius: 7,
+          background: active ? C.bgActive : hovered ? C.bgHover : 'transparent',
+          border: active ? `1px solid ${C.accentBorder}` : '1px solid transparent',
+          color: active ? C.text : hovered ? C.muted : C.dim,
+          fontSize: 13,
+          fontWeight: active ? 600 : 400,
+          cursor: 'pointer',
+          transition: 'all 0.15s',
+          userSelect: 'none',
+          textDecoration: 'none',
         }}
       >
-        {label || 'Untitled'}
-      </span>
-      {/* Saving dot indicator (#12) */}
-      {isSaving && (
+        {emoji ? (
+          <span style={{ fontSize: 13, flexShrink: 0, lineHeight: 1 }}>{emoji}</span>
+        ) : (
+          <FileText size={13} style={{ opacity: 0.55, flexShrink: 0 }} />
+        )}
         <span
-          title="Saving…"
           style={{
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: 'rgba(250,204,21,0.70)',
-            flexShrink: 0,
-            animation: 'pulse-dot 1.2s ease-in-out infinite',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
           }}
-        />
+        >
+          {label || 'Untitled'}
+        </span>
+        {isSaving && (
+          <span
+            title="Saving…"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'rgba(250,204,21,0.70)',
+              flexShrink: 0,
+              animation: 'pulse-dot 1.2s ease-in-out infinite',
+            }}
+          />
+        )}
+      </Link>
+
+      {/* Trash icon — visible on row hover */}
+      {hovered && (
+        <button
+          title="Move to trash"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDeleteClick(id, label)
+          }}
+          onMouseEnter={() => setTrashHovered(true)}
+          onMouseLeave={() => setTrashHovered(false)}
+          style={{
+            position: 'absolute',
+            right: 5,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 22,
+            height: 22,
+            borderRadius: 5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: trashHovered ? 'rgba(239,68,68,0.14)' : 'rgba(226,234,255,0.06)',
+            border: `1px solid ${trashHovered ? 'rgba(239,68,68,0.28)' : 'transparent'}`,
+            color: trashHovered ? '#f87171' : 'rgba(226,234,255,0.35)',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            padding: 0,
+            fontFamily: 'inherit',
+          }}
+        >
+          <Trash2 size={11} />
+        </button>
       )}
+
       <style>{`
         @keyframes pulse-dot {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
         }
       `}</style>
-    </Link>
+    </div>
   )
 }
 
@@ -346,14 +393,16 @@ export default function Sidebar({
   const [wsOpen, setWsOpen] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [deletingPage, setDeletingPage] = useState<{ id: string; title: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const firstName = userFullName.split(' ')[0] || 'User'
 
-  // ── Zustand store: seed initial pages, then read live state ──────────
+  // ── Zustand store ──────────────────────────────────────────────
   const setPages = usePagesStore((s) => s.setPages)
   const pages = usePagesStore((s) => s.pages)
   const savingPageId = usePagesStore((s) => s.savingPageId)
+  const removePage = usePagesStore((s) => s.removePage)
 
-  // Seed the store once on mount (or when server-provided pages change)
   useEffect(() => {
     setPages(
       initialPages.map((p) => ({ id: p.id, title: p.title, emoji: p.emoji }))
@@ -361,6 +410,7 @@ export default function Sidebar({
   }, [initialPages, setPages])
 
   const isHome = pathname === '/dashboard'
+  const isTrash = pathname === '/dashboard/trash'
 
   async function handleConfirmLogout() {
     setShowLogoutModal(false)
@@ -373,12 +423,45 @@ export default function Sidebar({
     })
   }
 
+  // ── Delete flow ────────────────────────────────────────────────
+
+  function handleDeleteClick(id: string, title: string) {
+    setDeletingPage({ id, title })
+  }
+
+  async function handleConfirmDelete() {
+    if (!deletingPage) return
+    setIsDeleting(true)
+    try {
+      await softDeletePage(deletingPage.id)
+      removePage(deletingPage.id)
+      // If user is currently on the deleted page, navigate away
+      if (pathname === `/dashboard/${deletingPage.id}`) {
+        router.push('/dashboard')
+      }
+    } catch (err) {
+      console.error('[handleConfirmDelete]', err)
+    } finally {
+      setIsDeleting(false)
+      setDeletingPage(null)
+    }
+  }
+
   return (
     <>
       {showLogoutModal && (
         <LogoutModal
           onConfirm={handleConfirmLogout}
           onCancel={() => setShowLogoutModal(false)}
+        />
+      )}
+
+      {deletingPage && (
+        <DeletePageModal
+          title={deletingPage.title}
+          isLoading={isDeleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => !isDeleting && setDeletingPage(null)}
         />
       )}
 
@@ -456,6 +539,12 @@ export default function Sidebar({
             active={isHome}
           />
           <NavItem icon={<Settings size={14} />} label="Settings" />
+          <NavItem
+            icon={<Trash2 size={14} />}
+            label="Trash"
+            href="/dashboard/trash"
+            active={isTrash}
+          />
         </div>
 
         <div style={{ height: 1, background: C.border, margin: '2px 12px 4px' }} />
@@ -503,7 +592,6 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Live pages from Zustand store */}
           {pages.length === 0 ? (
             <div
               style={{
@@ -524,6 +612,7 @@ export default function Sidebar({
                 emoji={page.emoji}
                 active={pathname === `/dashboard/${page.id}`}
                 isSaving={savingPageId === page.id}
+                onDeleteClick={handleDeleteClick}
               />
             ))
           )}
