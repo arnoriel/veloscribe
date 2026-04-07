@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
+import { usePagesStore, SidebarPage } from '@/store/pagesStore'
 
 const C = {
   bg: '#070B1D',
@@ -34,7 +35,7 @@ function isUrl(value: string) {
   return value.startsWith('http://') || value.startsWith('https://')
 }
 
-export interface SidebarPage {
+export interface SidebarPageProp {
   id: string
   title: string
   emoji: string
@@ -45,7 +46,7 @@ interface SidebarProps {
   userAvatar: string
   workspaceName: string
   workspaceId: string
-  pages: SidebarPage[]
+  pages: SidebarPageProp[]
 }
 
 // ─── Nav item ─────────────────────────────────────────────────────────────
@@ -122,11 +123,13 @@ function PageItem({
   label,
   emoji,
   active = false,
+  isSaving = false,
 }: {
   id: string
   label: string
   emoji?: string
   active?: boolean
+  isSaving?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
 
@@ -167,6 +170,26 @@ function PageItem({
       >
         {label || 'Untitled'}
       </span>
+      {/* Saving dot indicator (#12) */}
+      {isSaving && (
+        <span
+          title="Saving…"
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: 'rgba(250,204,21,0.70)',
+            flexShrink: 0,
+            animation: 'pulse-dot 1.2s ease-in-out infinite',
+          }}
+        />
+      )}
+      <style>{`
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
     </Link>
   )
 }
@@ -316,7 +339,7 @@ export default function Sidebar({
   userAvatar,
   workspaceName,
   workspaceId,
-  pages,
+  pages: initialPages,
 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -324,6 +347,18 @@ export default function Sidebar({
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [isPending, startTransition] = useTransition()
   const firstName = userFullName.split(' ')[0] || 'User'
+
+  // ── Zustand store: seed initial pages, then read live state ──────────
+  const setPages = usePagesStore((s) => s.setPages)
+  const pages = usePagesStore((s) => s.pages)
+  const savingPageId = usePagesStore((s) => s.savingPageId)
+
+  // Seed the store once on mount (or when server-provided pages change)
+  useEffect(() => {
+    setPages(
+      initialPages.map((p) => ({ id: p.id, title: p.title, emoji: p.emoji }))
+    )
+  }, [initialPages, setPages])
 
   const isHome = pathname === '/dashboard'
 
@@ -468,7 +503,7 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Dynamic pages from Supabase */}
+          {/* Live pages from Zustand store */}
           {pages.length === 0 ? (
             <div
               style={{
@@ -488,6 +523,7 @@ export default function Sidebar({
                 label={page.title}
                 emoji={page.emoji}
                 active={pathname === `/dashboard/${page.id}`}
+                isSaving={savingPageId === page.id}
               />
             ))
           )}

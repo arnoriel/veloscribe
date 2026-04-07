@@ -14,6 +14,7 @@ export interface SlashCommandItem {
   title: string
   description: string
   icon: string
+  group: 'Basic' | 'Advanced'
   command: (args: { editor: Editor; range: Range }) => void
 }
 
@@ -35,6 +36,37 @@ const C = {
   dim: 'rgba(226,234,255,0.28)',
   accent: '#4D7FFF',
   accentLight: '#7AA3FF',
+}
+
+// ─── Group label separator ──────────────────────────────────────────────────
+
+function GroupLabel({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: '6px 10px 4px',
+        fontSize: 10,
+        fontWeight: 700,
+        color: C.dim,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+      }}
+    >
+      {label}
+    </div>
+  )
+}
+
+function GroupDivider() {
+  return (
+    <div
+      style={{
+        height: 1,
+        background: C.border,
+        margin: '4px 6px',
+      }}
+    />
+  )
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -98,6 +130,92 @@ const SlashCommandMenu = forwardRef<
     )
   }
 
+  // Group items
+  const basicItems = items.filter((i) => i.group === 'Basic')
+  const advancedItems = items.filter((i) => i.group === 'Advanced')
+
+  // Flat list for index tracking (same order as rendered)
+  const flatItems = [...basicItems, ...advancedItems]
+
+  function renderItem(item: SlashCommandItem) {
+    const index = flatItems.indexOf(item)
+    const isActive = index === selectedIndex
+    return (
+      <button
+        key={item.title}
+        onClick={() => command(item)}
+        onMouseEnter={() => setSelectedIndex(index)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 10px',
+          borderRadius: 8,
+          background: isActive ? C.bgActive : 'transparent',
+          border: isActive
+            ? `1px solid ${C.borderActive}`
+            : '1px solid transparent',
+          cursor: 'pointer',
+          transition: 'all 0.1s',
+          textAlign: 'left',
+          fontFamily: 'inherit',
+        }}
+      >
+        {/* Icon badge */}
+        <div
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 7,
+            background: isActive
+              ? 'rgba(77,127,255,0.20)'
+              : 'rgba(226,234,255,0.05)',
+            border: `1px solid ${
+              isActive
+                ? 'rgba(77,127,255,0.30)'
+                : 'rgba(226,234,255,0.08)'
+            }`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            fontSize: 11,
+            fontWeight: 800,
+            color: isActive ? C.accentLight : C.muted,
+            letterSpacing: '-0.02em',
+          }}
+        >
+          {item.icon}
+        </div>
+
+        {/* Text */}
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: isActive ? C.text : C.muted,
+              lineHeight: 1.3,
+              marginBottom: 1,
+            }}
+          >
+            {item.title}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: C.dim,
+              lineHeight: 1.3,
+            }}
+          >
+            {item.description}
+          </div>
+        </div>
+      </button>
+    )
+  }
+
   return (
     <div
       style={{
@@ -108,101 +226,30 @@ const SlashCommandMenu = forwardRef<
         padding: '6px',
         boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(77,127,255,0.08)',
         fontFamily: 'var(--font-sans, system-ui)',
-        maxHeight: 320,
+        maxHeight: 340,
         overflowY: 'auto',
       }}
     >
-      {/* Header label */}
-      <div
-        style={{
-          padding: '4px 10px 8px',
-          fontSize: 10,
-          fontWeight: 700,
-          color: C.dim,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Blocks
-      </div>
+      {/* Basic Blocks group */}
+      {basicItems.length > 0 && (
+        <>
+          <GroupLabel label="Basic Blocks" />
+          {basicItems.map(renderItem)}
+        </>
+      )}
 
-      {items.map((item, index) => {
-        const isActive = index === selectedIndex
-        return (
-          <button
-            key={item.title}
-            onClick={() => command(item)}
-            onMouseEnter={() => setSelectedIndex(index)}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '8px 10px',
-              borderRadius: 8,
-              background: isActive ? C.bgActive : 'transparent',
-              border: isActive
-                ? `1px solid ${C.borderActive}`
-                : '1px solid transparent',
-              cursor: 'pointer',
-              transition: 'all 0.1s',
-              textAlign: 'left',
-              fontFamily: 'inherit',
-            }}
-          >
-            {/* Icon badge */}
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 7,
-                background: isActive
-                  ? 'rgba(77,127,255,0.20)'
-                  : 'rgba(226,234,255,0.05)',
-                border: `1px solid ${
-                  isActive
-                    ? 'rgba(77,127,255,0.30)'
-                    : 'rgba(226,234,255,0.08)'
-                }`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                fontSize: 11,
-                fontWeight: 800,
-                color: isActive ? C.accentLight : C.muted,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {item.icon}
-            </div>
+      {/* Divider between groups */}
+      {basicItems.length > 0 && advancedItems.length > 0 && (
+        <GroupDivider />
+      )}
 
-            {/* Text */}
-            <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: isActive ? C.text : C.muted,
-                  lineHeight: 1.3,
-                  marginBottom: 1,
-                }}
-              >
-                {item.title}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: C.dim,
-                  lineHeight: 1.3,
-                }}
-              >
-                {item.description}
-              </div>
-            </div>
-          </button>
-        )
-      })}
+      {/* Advanced Blocks group */}
+      {advancedItems.length > 0 && (
+        <>
+          <GroupLabel label="Advanced Blocks" />
+          {advancedItems.map(renderItem)}
+        </>
+      )}
     </div>
   )
 })

@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { useDebouncedCallback } from 'use-debounce'
 import { SlashCommand } from './extensions/SlashCommand'
 import { updatePageContent } from '@/app/actions/pages'
+import { usePagesStore } from '@/store/pagesStore'
 
 // ─── Colours (matches app palette) ───────────────────────────────────────────
 
@@ -30,7 +31,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
     saved: '✓ Saved',
     saving: 'Saving…',
     unsaved: 'Unsaved changes',
-    error: '⚠ Save failed',
+    error: '⚠ Save failed — retrying…',
   }
   const colors: Record<SaveStatus, string> = {
     saved: 'rgba(74,222,128,0.65)',
@@ -51,6 +52,54 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
     >
       {labels[status]}
     </span>
+  )
+}
+
+// ─── Bubble menu toolbar button ───────────────────────────────────────────────
+
+function BubbleBtn({
+  onClick,
+  active,
+  children,
+  title,
+}: {
+  onClick: () => void
+  active?: boolean
+  children: React.ReactNode
+  title?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        padding: '4px 8px',
+        borderRadius: 6,
+        background: active ? 'rgba(77,127,255,0.28)' : 'transparent',
+        border: active ? '1px solid rgba(77,127,255,0.45)' : '1px solid transparent',
+        color: active ? C.accentLight : C.muted,
+        cursor: 'pointer',
+        fontSize: 12,
+        fontWeight: 700,
+        lineHeight: 1,
+        transition: 'all 0.1s',
+        fontFamily: 'inherit',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(226,234,255,0.08)'
+          ;(e.currentTarget as HTMLButtonElement).style.color = C.text
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+          ;(e.currentTarget as HTMLButtonElement).style.color = C.muted
+        }
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -75,25 +124,67 @@ export default function TipTapEditor({
   const [title, setTitle] = useState(initialTitle || 'Untitled')
   const [emoji, setEmoji] = useState(initialEmoji || '📄')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
-  const titleRef = useRef<HTMLTextAreaElement>(null)
+  const titleTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // ── Refs to avoid stale closures in onUpdate (#1 fix) ──────────────────
+  const titleRef = useRef(title)
+  const emojiRef = useRef(emoji)
+  useEffect(() => { titleRef.current = title }, [title])
+  useEffect(() => { emojiRef.current = emoji }, [emoji])
+
+  // ── Zustand store sync ─────────────────────────────────────────────────
+  const updatePageMeta = usePagesStore((s) => s.updatePageMeta)
+  const setSavingPageId = usePagesStore((s) => s.setSavingPageId)
 
   // ── Auto-resize title textarea ──────────────────────────────────────────
   useEffect(() => {
-    const el = titleRef.current
+    const el = titleTextareaRef.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [title])
 
-  // ── Debounced save (1.5 s after last change) ────────────────────────────
+  // ── Browser tab title sync (#11 fix) ───────────────────────────────────
+  useEffect(() => {
+    document.title = `${emoji} ${title} — Veloscribe`
+  }, [title, emoji])
+
+  // ── Beforeunload guard (#3 fix) ─────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (saveStatus === 'unsaved' || saveStatus === 'saving') {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [saveStatus])
+
+  // ── Debounced save with retry (#2 fix) ──────────────────────────────────
   const debouncedSave = useDebouncedCallback(
     async (content: object, currentTitle: string, currentEmoji: string) => {
       setSaveStatus('saving')
+      setSavingPageId(pageId)
       try {
         await updatePageContent(pageId, content, currentTitle, currentEmoji)
         setSaveStatus('saved')
+        updatePageMeta(pageId, currentTitle, currentEmoji) // live sidebar update (#6 fix)
+        setSavingPageId(null)
       } catch {
         setSaveStatus('error')
+        // retry once after 2 seconds (#2 fix)
+        setTimeout(async () => {
+          try {
+            await updatePageContent(pageId, content, currentTitle, currentEmoji)
+            setSaveStatus('saved')
+            updatePageMeta(pageId, currentTitle, currentEmoji)
+          } catch {
+            setSaveStatus('error')
+          } finally {
+            setSavingPageId(null)
+          }
+        }, 2000)
       }
     },
     1500
@@ -105,16 +196,16 @@ export default function TipTapEditor({
     extensions: [
       StarterKit.configure({
         bulletList: {
-            keepMarks: true,
-            keepAttributes: false,
+          keepMarks: true,
+          keepAttributes: false,
         },
         orderedList: {
-            keepMarks: true,
-            keepAttributes: false,
+          keepMarks: true,
+          keepAttributes: false,
         },
         heading: { levels: [1, 2, 3] },
         codeBlock: { languageClassPrefix: 'language-' },
-        }),
+      }),
       Placeholder.configure({
         placeholder: ({ node }) => {
           if (node.type.name === 'heading') return 'Heading…'
@@ -136,9 +227,30 @@ export default function TipTapEditor({
     onUpdate({ editor }) {
       setSaveStatus('unsaved')
       const json = editor.getJSON()
-      debouncedSave(json, title, emoji)
+      // Use refs so title/emoji are always fresh (#1 fix)
+      debouncedSave(json, titleRef.current, emojiRef.current)
     },
   })
+
+  // ── Ctrl+S flush (#9 fix) ───────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        debouncedSave.flush()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [debouncedSave])
+
+  // ── Word count (#7 fix) ─────────────────────────────────────────────────
+  const wordCount =
+    editor
+      ?.getText()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length ?? 0
 
   // ── Trigger save also when title/emoji changes ──────────────────────────
   const handleTitleChange = useCallback(
@@ -147,10 +259,10 @@ export default function TipTapEditor({
       setTitle(val)
       setSaveStatus('unsaved')
       if (editor) {
-        debouncedSave(editor.getJSON(), val, emoji)
+        debouncedSave(editor.getJSON(), val, emojiRef.current)
       }
     },
-    [editor, emoji, debouncedSave]
+    [editor, debouncedSave]
   )
 
   const handleEmojiChange = useCallback(
@@ -159,10 +271,10 @@ export default function TipTapEditor({
       setEmoji(val)
       setSaveStatus('unsaved')
       if (editor) {
-        debouncedSave(editor.getJSON(), title, val)
+        debouncedSave(editor.getJSON(), titleRef.current, val)
       }
     },
-    [editor, title, debouncedSave]
+    [editor, debouncedSave]
   )
 
   return (
@@ -187,11 +299,101 @@ export default function TipTapEditor({
           alignItems: 'center',
           justifyContent: 'flex-end',
           padding: '10px 40px',
-          gap: 12,
+          gap: 16,
         }}
       >
+        {/* Word count (#7) */}
+        <span style={{ fontSize: 11, color: C.dim, userSelect: 'none' }}>
+          {wordCount} {wordCount === 1 ? 'word' : 'words'}
+        </span>
+
+        {/* Ctrl+S hint */}
+        <span style={{ fontSize: 10, color: C.dim, opacity: 0.6, userSelect: 'none' }}>
+          ⌘S to save
+        </span>
+
         <SaveIndicator status={saveStatus} />
       </div>
+
+      {/* ── Bubble Menu (#5 fix) ─────────────────────────────────────── */}
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          tippyOptions={{ duration: 120, placement: 'top' }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              background: '#0C1428',
+              border: `1px solid rgba(226,234,255,0.10)`,
+              borderRadius: 10,
+              padding: '4px 6px',
+              boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(77,127,255,0.10)',
+            }}
+          >
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              active={editor.isActive('bold')}
+              title="Bold (⌘B)"
+            >
+              B
+            </BubbleBtn>
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              active={editor.isActive('italic')}
+              title="Italic (⌘I)"
+            >
+              <em>I</em>
+            </BubbleBtn>
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+              active={editor.isActive('strike')}
+              title="Strikethrough"
+            >
+              <s>S</s>
+            </BubbleBtn>
+            <div style={{ width: 1, height: 16, background: 'rgba(226,234,255,0.10)', margin: '0 2px' }} />
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleCode().run()}
+              active={editor.isActive('code')}
+              title="Inline code"
+            >
+              {'`'}
+            </BubbleBtn>
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              active={editor.isActive('heading', { level: 1 })}
+              title="Heading 1"
+            >
+              H1
+            </BubbleBtn>
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              active={editor.isActive('heading', { level: 2 })}
+              title="Heading 2"
+            >
+              H2
+            </BubbleBtn>
+            <div style={{ width: 1, height: 16, background: 'rgba(226,234,255,0.10)', margin: '0 2px' }} />
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              active={editor.isActive('bulletList')}
+              title="Bullet list"
+            >
+              •≡
+            </BubbleBtn>
+            <BubbleBtn
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              active={editor.isActive('blockquote')}
+              title="Quote"
+            >
+              ❝
+            </BubbleBtn>
+          </div>
+        </BubbleMenu>
+      )}
 
       {/* ── Editor area ─────────────────────────────────────────────── */}
       <div
@@ -228,7 +430,7 @@ export default function TipTapEditor({
 
         {/* Title */}
         <textarea
-          ref={titleRef}
+          ref={titleTextareaRef}
           value={title}
           onChange={handleTitleChange}
           rows={1}

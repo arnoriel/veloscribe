@@ -4,13 +4,15 @@ import { ReactRenderer } from '@tiptap/react'
 import type { Editor, Range } from '@tiptap/core'
 import SlashCommandMenu, { SlashCommandItem } from '../SlashCommandMenu'
 
-// ─── Command definitions ───────────────────────────────────────────────────
+// ─── Command definitions (grouped) ────────────────────────────────────────
 
 const SLASH_ITEMS: SlashCommandItem[] = [
+  // ── Basic Blocks ───────────────────────────────────────────────────────
   {
     title: 'Text',
     description: 'Plain paragraph text',
     icon: '¶',
+    group: 'Basic',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor.chain().focus().deleteRange(range).setParagraph().run()
     },
@@ -19,6 +21,7 @@ const SLASH_ITEMS: SlashCommandItem[] = [
     title: 'Heading 1',
     description: 'Large section heading',
     icon: 'H1',
+    group: 'Basic',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor
         .chain()
@@ -32,6 +35,7 @@ const SLASH_ITEMS: SlashCommandItem[] = [
     title: 'Heading 2',
     description: 'Medium section heading',
     icon: 'H2',
+    group: 'Basic',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor
         .chain()
@@ -45,6 +49,7 @@ const SLASH_ITEMS: SlashCommandItem[] = [
     title: 'Heading 3',
     description: 'Small section heading',
     icon: 'H3',
+    group: 'Basic',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor
         .chain()
@@ -54,10 +59,13 @@ const SLASH_ITEMS: SlashCommandItem[] = [
         .run()
     },
   },
+
+  // ── Advanced Blocks ────────────────────────────────────────────────────
   {
     title: 'Bullet List',
     description: 'Unordered list with bullets',
     icon: '•',
+    group: 'Advanced',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor.chain().focus().deleteRange(range).toggleBulletList().run()
     },
@@ -66,6 +74,7 @@ const SLASH_ITEMS: SlashCommandItem[] = [
     title: 'Numbered List',
     description: 'Ordered list with numbers',
     icon: '1.',
+    group: 'Advanced',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor.chain().focus().deleteRange(range).toggleOrderedList().run()
     },
@@ -74,6 +83,7 @@ const SLASH_ITEMS: SlashCommandItem[] = [
     title: 'Quote',
     description: 'Blockquote for callouts',
     icon: '"',
+    group: 'Advanced',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor.chain().focus().deleteRange(range).toggleBlockquote().run()
     },
@@ -82,6 +92,7 @@ const SLASH_ITEMS: SlashCommandItem[] = [
     title: 'Code Block',
     description: 'Multi-line code block',
     icon: '</>',
+    group: 'Advanced',
     command: ({ editor, range }: { editor: Editor; range: Range }) => {
       editor.chain().focus().deleteRange(range).toggleCodeBlock().run()
     },
@@ -96,8 +107,13 @@ const renderMenu: SuggestionRenderer = () => {
   let component: ReactRenderer | null = null
   let containerEl: HTMLDivElement | null = null
 
+  // #4 fix: Use AbortController to detect if component was cleaned up early
+  let destroyed = false
+
   return {
     onStart(props) {
+      if (destroyed) return
+
       containerEl = document.createElement('div')
       containerEl.style.position = 'absolute'
       containerEl.style.zIndex = '9999'
@@ -113,13 +129,16 @@ const renderMenu: SuggestionRenderer = () => {
     },
 
     onUpdate(props) {
+      if (destroyed) return
       component?.updateProps(props)
       positionContainer(containerEl, props.clientRect)
     },
 
     onKeyDown(props) {
+      if (destroyed) return false
       if (props.event.key === 'Escape') {
         cleanup(component, containerEl)
+        destroyed = true
         return true
       }
       // Delegate arrow / enter keys to the menu component
@@ -131,6 +150,7 @@ const renderMenu: SuggestionRenderer = () => {
       cleanup(component, containerEl)
       component = null
       containerEl = null
+      destroyed = true
     },
   }
 }
@@ -144,7 +164,7 @@ function positionContainer(
   if (!rect) return
 
   const menuWidth = 260
-  const menuHeight = 300
+  const menuHeight = 340
   const viewportW = window.innerWidth
   const viewportH = window.innerHeight
 
@@ -166,8 +186,16 @@ function positionContainer(
 }
 
 function cleanup(component: ReactRenderer | null, el: HTMLDivElement | null) {
-  component?.destroy()
-  el?.remove()
+  try {
+    component?.destroy()
+  } catch {
+    // silently ignore if already destroyed
+  }
+  try {
+    el?.remove()
+  } catch {
+    // silently ignore
+  }
 }
 
 // ─── Extension ────────────────────────────────────────────────────────────
@@ -212,8 +240,8 @@ export const SlashCommand = Extension.create({
   addProseMirrorPlugins() {
     return [
       Suggestion({
-          ...(this.options.suggestion as SuggestionOptions),
-          editor: this.editor,
+        ...(this.options.suggestion as SuggestionOptions),
+        editor: this.editor,
       }),
     ]
   },
