@@ -130,6 +130,53 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
       editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
 
+  // ── NEW: Column layouts ───────────────────────────────────────────────────
+  {
+    title: '2 Columns',
+    description: 'Split content into 2 side-by-side columns',
+    icon: '⫿',
+    group: 'Blocks',
+    keywords: ['columns', 'col', '2col', 'split', 'layout', 'side', 'row', 'summary'],
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: 'columns',
+          attrs: { cols: 2 },
+          content: [
+            { type: 'column', content: [{ type: 'paragraph' }] },
+            { type: 'column', content: [{ type: 'paragraph' }] },
+          ],
+        })
+        .run()
+    },
+  },
+  {
+    title: '3 Columns',
+    description: 'Split content into 3 side-by-side columns',
+    icon: '⦀',
+    group: 'Blocks',
+    keywords: ['columns', 'col', '3col', 'split', 'layout', 'three', 'row', 'summary'],
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: 'columns',
+          attrs: { cols: 3 },
+          content: [
+            { type: 'column', content: [{ type: 'paragraph' }] },
+            { type: 'column', content: [{ type: 'paragraph' }] },
+            { type: 'column', content: [{ type: 'paragraph' }] },
+          ],
+        })
+        .run()
+    },
+  },
+
   // ── Advanced ──────────────────────────────────────────────────────────────
   {
     title: 'Table',
@@ -152,7 +199,7 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
 //
 // CRITICAL: @tiptap/suggestion calls render() ONCE when the plugin initialises,
 // then reuses the returned handler object for EVERY suggestion session.
-// 
+//
 // The previous implementation used an `active` flag that was set to false in
 // onExit() — which meant every session after the first one would silently bail
 // out in onStart() because `if (!active) return` evaluated true.
@@ -172,8 +219,6 @@ const renderMenu: SuggestionRenderer = () => {
   return {
     onStart(props) {
       // Always clean up any leftover DOM from a previous session before starting.
-      // This is a safety net — normally onExit() handles cleanup, but defensive
-      // teardown here ensures a fresh state even if onExit() was missed.
       cleanup(component, containerEl)
       component = null
       containerEl = null
@@ -191,7 +236,6 @@ const renderMenu: SuggestionRenderer = () => {
     },
 
     onUpdate(props) {
-      // Guard: if component is null this session never started properly — skip.
       if (!component) return
       component.updateProps(props)
       positionContainer(containerEl, props.clientRect)
@@ -215,8 +259,6 @@ const renderMenu: SuggestionRenderer = () => {
       cleanup(component, containerEl)
       component = null
       containerEl = null
-      // NOTE: do NOT set any shared boolean flag here.
-      // onStart() will be called again for the next session and will reinitialise.
     },
   }
 }
@@ -267,23 +309,13 @@ export const SlashCommand = Extension.create({
       suggestion: {
         char: '/',
         allowSpaces: false,
-        // startOfLine: false allows '/' to be detected anywhere in the node,
-        // but we use `allow()` below to restrict it to empty lines only.
         startOfLine: false,
 
-        // Only trigger the slash menu when '/' is typed at the very start of an
-        // otherwise-empty block (parentOffset === 0 means no text precedes it).
-        // This satisfies the requirement: '/' mid-sentence = plain text,
-        // '/' on a blank line = open command menu, works on ANY line without refresh.
         allow({ state, range }) {
           const $from = state.doc.resolve(range.from)
-          // parentOffset is the character offset within the parent node.
-          // 0 means the cursor / trigger char is at the very beginning of the node.
           return $from.parentOffset === 0
         },
 
-        // NOTE: TipTap's suggestion `items()` is the single source of truth for filtering.
-        // SlashCommandMenu must NOT re-filter — that causes double-filtering bugs.
         items: ({ query }: { query: string }): SlashCommandItem[] => {
           const q = query.toLowerCase().trim()
           if (!q) return SLASH_ITEMS

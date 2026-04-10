@@ -26,6 +26,7 @@ import CharacterCount from '@tiptap/extension-character-count'
 import { useDebouncedCallback } from 'use-debounce'
 import { SlashCommand } from './extensions/SlashCommand'
 import { CalloutBlock } from './extensions/CallOutBlock'
+import { Columns, Column } from './extensions/ColumnBlock'
 import { updatePageContent } from '@/app/actions/pages'
 import { usePagesStore } from '@/store/pagesStore'
 
@@ -523,6 +524,8 @@ export default function TipTapEditor({
       TableCell,
       CharacterCount,
       CalloutBlock,
+      Columns,
+      Column,
       SlashCommand,
     ],
     content: initialContent ?? undefined,
@@ -1351,6 +1354,47 @@ export default function TipTapEditor({
         
         /* ─ Scrollbar ──────────────────────────────────────────── */
         .veloscribe-editor::-webkit-scrollbar { display: none; }
+
+        /* ─ Column layout ──────────────────────────────────────── */
+        /* The columns wrapper renders as a CSS grid.              */
+        /* data-cols attribute controls number of tracks.           */
+        .veloscribe-editor div[data-type="columns"] {
+          display: grid;
+          gap: 12px;
+          margin: 0.75em 0;
+          align-items: start;
+        }
+        .veloscribe-editor div[data-type="columns"][data-cols="2"] {
+          grid-template-columns: 1fr 1fr;
+        }
+        .veloscribe-editor div[data-type="columns"][data-cols="3"] {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        /* Individual column cell */
+        .veloscribe-editor div[data-type="column"] {
+          border: 1px solid rgba(226,234,255,0.08);
+          border-radius: 8px;
+          padding: 12px 14px;
+          min-height: 48px;
+          transition: border-color 0.15s;
+          position: relative;
+        }
+        .veloscribe-editor div[data-type="column"]:focus-within {
+          border-color: rgba(77,127,255,0.32);
+          background: rgba(77,127,255,0.03);
+        }
+        /* Remove bottom margin from last child so column height is tight */
+        .veloscribe-editor div[data-type="column"] > *:last-child {
+          margin-bottom: 0;
+        }
+        /* Responsive: stack columns on narrow viewports */
+        @media (max-width: 640px) {
+          .veloscribe-editor div[data-type="columns"][data-cols="2"],
+          .veloscribe-editor div[data-type="columns"][data-cols="3"] {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
     </div>
   )
