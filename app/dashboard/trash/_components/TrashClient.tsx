@@ -116,6 +116,8 @@ function PermanentDeleteModal({
           animation: 'slideUp 0.2s ease',
           display: 'flex',
           flexDirection: 'column',
+          // relative positioning so the close button can be absolute inside
+          position: 'relative',
         }}
       >
         {/* Close */}
@@ -123,7 +125,7 @@ function PermanentDeleteModal({
           onClick={onCancel}
           disabled={isLoading}
           style={{
-            position: 'absolute' as const,
+            position: 'absolute',
             top: 14,
             right: 14,
             width: 24,
@@ -135,8 +137,9 @@ function PermanentDeleteModal({
             alignItems: 'center',
             justifyContent: 'center',
             color: C.dim,
-            cursor: 'pointer',
+            cursor: isLoading ? 'default' : 'pointer',
             padding: 0,
+            opacity: isLoading ? 0.4 : 1,
           }}
         >
           <X size={14} />
@@ -258,13 +261,16 @@ function TrashItem({
   page,
   onRestore,
   onDelete,
+  restoringId,
 }: {
   page: Page
   onRestore: (id: string) => void
   onDelete: (id: string, title: string) => void
+  restoringId: string | null
 }) {
   const [hovered, setHovered] = useState(false)
   const days = getDaysRemaining(page.deleted_at)
+  const isRestoring = restoringId === page.id
 
   return (
     <div
@@ -281,6 +287,7 @@ function TrashItem({
         border: `1px solid ${hovered ? C.borderStrong : C.border}`,
         borderRadius: 12,
         transition: 'all 0.18s',
+        opacity: isRestoring ? 0.55 : 1,
       }}
     >
       {/* Emoji */}
@@ -337,6 +344,7 @@ function TrashItem({
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <button
           onClick={() => onRestore(page.id)}
+          disabled={isRestoring}
           title="Restore page"
           style={{
             display: 'flex',
@@ -349,11 +357,13 @@ function TrashItem({
             color: C.accentLight,
             fontSize: 12,
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: isRestoring ? 'default' : 'pointer',
             transition: 'all 0.15s',
             fontFamily: 'inherit',
+            opacity: isRestoring ? 0.5 : 1,
           }}
           onMouseEnter={(e) => {
+            if (isRestoring) return
             const el = e.currentTarget as HTMLButtonElement
             el.style.background = 'rgba(77,127,255,0.18)'
             el.style.borderColor = C.accentBorder
@@ -365,11 +375,12 @@ function TrashItem({
           }}
         >
           <RotateCcw size={12} />
-          Restore
+          {isRestoring ? 'Restoring…' : 'Restore'}
         </button>
 
         <button
           onClick={() => onDelete(page.id, page.title)}
+          disabled={isRestoring}
           title="Delete forever"
           style={{
             display: 'flex',
@@ -382,11 +393,13 @@ function TrashItem({
             color: '#f87171',
             fontSize: 12,
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: isRestoring ? 'default' : 'pointer',
             transition: 'all 0.15s',
             fontFamily: 'inherit',
+            opacity: isRestoring ? 0.4 : 1,
           }}
           onMouseEnter={(e) => {
+            if (isRestoring) return
             const el = e.currentTarget as HTMLButtonElement
             el.style.background = 'rgba(239,68,68,0.15)'
             el.style.borderColor = 'rgba(239,68,68,0.30)'
@@ -463,13 +476,16 @@ export default function TrashClient({ pages: initialPages }: TrashClientProps) {
   const [pages, setPages] = useState<Page[]>(initialPages)
   const [, startTransition] = useTransition()
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
+  // Separate loading states for restore (per-page) and permanent delete
+  const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // ── Restore ────────────────────────────────────────────────────
 
   function handleRestore(id: string) {
+    if (restoringId) return // prevent double-click
     startTransition(async () => {
-      setIsProcessing(true)
+      setRestoringId(id)
       try {
         await restorePage(id)
         setPages((prev) => prev.filter((p) => p.id !== id))
@@ -477,7 +493,7 @@ export default function TrashClient({ pages: initialPages }: TrashClientProps) {
       } catch (err) {
         console.error('[handleRestore]', err)
       } finally {
-        setIsProcessing(false)
+        setRestoringId(null)
       }
     })
   }
@@ -490,7 +506,7 @@ export default function TrashClient({ pages: initialPages }: TrashClientProps) {
 
   async function handleConfirmPermanentDelete() {
     if (!confirmDelete) return
-    setIsProcessing(true)
+    setIsDeleting(true)
     try {
       await permanentDeletePage(confirmDelete.id)
       setPages((prev) => prev.filter((p) => p.id !== confirmDelete.id))
@@ -498,7 +514,7 @@ export default function TrashClient({ pages: initialPages }: TrashClientProps) {
     } catch (err) {
       console.error('[handleConfirmPermanentDelete]', err)
     } finally {
-      setIsProcessing(false)
+      setIsDeleting(false)
       setConfirmDelete(null)
     }
   }
@@ -508,9 +524,9 @@ export default function TrashClient({ pages: initialPages }: TrashClientProps) {
       {confirmDelete && (
         <PermanentDeleteModal
           title={confirmDelete.title}
-          isLoading={isProcessing}
+          isLoading={isDeleting}
           onConfirm={handleConfirmPermanentDelete}
-          onCancel={() => !isProcessing && setConfirmDelete(null)}
+          onCancel={() => !isDeleting && setConfirmDelete(null)}
         />
       )}
 
@@ -623,12 +639,13 @@ export default function TrashClient({ pages: initialPages }: TrashClientProps) {
                   page={page}
                   onRestore={handleRestore}
                   onDelete={handleDeleteClick}
+                  restoringId={restoringId}
                 />
               ))}
             </div>
           )}
 
-          {/* ── Divider + file icon legend ──────────────────────── */}
+          {/* ── Legend ──────────────────────────────────────────── */}
           {pages.length > 0 && (
             <div
               style={{

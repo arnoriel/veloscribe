@@ -395,6 +395,7 @@ export default function Sidebar({
   const [isPending, startTransition] = useTransition()
   const [deletingPage, setDeletingPage] = useState<{ id: string; title: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const firstName = userFullName.split(' ')[0] || 'User'
 
   // ── Zustand store ──────────────────────────────────────────────
@@ -418,8 +419,21 @@ export default function Sidebar({
   }
 
   function handleNewPage() {
+    if (isPending) return
+    setCreateError(null)
     startTransition(async () => {
-      await createPage(workspaceId)
+      try {
+        await createPage(workspaceId)
+      } catch (err) {
+        // createPage uses redirect() which throws a special Next.js error —
+        // only surface real errors, not the redirect signal.
+        const message = err instanceof Error ? err.message : String(err)
+        if (!message.includes('NEXT_REDIRECT')) {
+          setCreateError('Failed to create page. Please try again.')
+          // Auto-clear after 3s
+          setTimeout(() => setCreateError(null), 3000)
+        }
+      }
     })
   }
 
@@ -578,6 +592,7 @@ export default function Sidebar({
                 opacity: isPending ? 0.4 : 1,
               }}
               onMouseEnter={(e) => {
+                if (isPending) return
                 const el = e.currentTarget as HTMLButtonElement
                 el.style.background = C.bgHover
                 el.style.color = C.accentLight
@@ -591,6 +606,24 @@ export default function Sidebar({
               <Plus size={12} />
             </button>
           </div>
+
+          {/* Error message for page creation failure */}
+          {createError && (
+            <div
+              style={{
+                margin: '0 2px 6px',
+                padding: '7px 10px',
+                borderRadius: 7,
+                background: 'rgba(239,68,68,0.09)',
+                border: '1px solid rgba(239,68,68,0.20)',
+                fontSize: 11,
+                color: '#f87171',
+                lineHeight: 1.5,
+              }}
+            >
+              {createError}
+            </div>
+          )}
 
           {pages.length === 0 ? (
             <div
@@ -634,6 +667,7 @@ export default function Sidebar({
               opacity: isPending ? 0.5 : 1,
             }}
             onMouseEnter={(e) => {
+              if (isPending) return
               const el = e.currentTarget as HTMLDivElement
               el.style.background = 'rgba(77,127,255,0.06)'
               el.style.borderColor = 'rgba(77,127,255,0.28)'

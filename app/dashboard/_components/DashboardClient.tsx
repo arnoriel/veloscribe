@@ -186,7 +186,7 @@ function QuickActionCard({
         border: `1px solid ${accent ? C.accentBorder : C.borderStrong}`,
         borderRadius: 13,
         padding: '16px 18px',
-        cursor: loading ? 'default' : 'pointer',
+        cursor: loading ? 'default' : onClick ? 'pointer' : 'default',
         display: 'flex',
         alignItems: 'center',
         gap: 14,
@@ -196,7 +196,7 @@ function QuickActionCard({
         opacity: loading ? 0.6 : 1,
       }}
       onMouseEnter={(e) => {
-        if (loading) return
+        if (loading || !onClick) return
         const el = e.currentTarget as HTMLDivElement
         el.style.transform = 'translateY(-2px)'
         el.style.boxShadow = `0 10px 28px rgba(0,0,0,0.22), 0 0 0 1px ${
@@ -300,7 +300,7 @@ function EmptyRecentDocs({ onNewPage, loading }: { onNewPage: () => void; loadin
   )
 }
 
-/* ── Main export ────────────────────────────────────────────── */
+/* ── Main export ────────────────────────────────────── */
 
 interface DashboardClientProps {
   firstName: string
@@ -325,6 +325,7 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const [showAnim, setShowAnim] = useState(showWelcome)
   const [isPending, startTransition] = useTransition()
+  const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
     if (showWelcome) {
@@ -335,8 +336,20 @@ export default function DashboardClient({
   }, [showWelcome])
 
   function handleNewPage() {
+    if (isPending) return
+    setCreateError(null)
     startTransition(async () => {
-      await createPage(workspaceId)
+      try {
+        await createPage(workspaceId)
+      } catch (err) {
+        // createPage uses redirect() which throws a special Next.js signal —
+        // only surface genuine errors, not the redirect.
+        const message = err instanceof Error ? err.message : String(err)
+        if (!message.includes('NEXT_REDIRECT')) {
+          setCreateError('Failed to create page. Please try again.')
+          setTimeout(() => setCreateError(null), 3500)
+        }
+      }
     })
   }
 
@@ -375,6 +388,31 @@ export default function DashboardClient({
         />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
+          {/* ── Error toast ──────────────────────────────────────── */}
+          {createError && (
+            <div
+              style={{
+                position: 'fixed',
+                bottom: 28,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 9999,
+                background: 'rgba(239,68,68,0.14)',
+                border: '1px solid rgba(239,68,68,0.30)',
+                borderRadius: 10,
+                padding: '10px 18px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#f87171',
+                boxShadow: '0 8px 28px rgba(0,0,0,0.40)',
+                animation: 'slideUp 0.2s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {createError}
+            </div>
+          )}
+
           {/* ── Welcome header ──────────────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
             <AvatarDisplay value={avatar} size={50} />
@@ -580,6 +618,13 @@ export default function DashboardClient({
             </div>
           </div>
         </div>
+
+        <style>{`
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+          }
+        `}</style>
       </div>
     </>
   )
