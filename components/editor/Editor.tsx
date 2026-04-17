@@ -29,6 +29,7 @@ import { CalloutBlock } from './extensions/CallOutBlock'
 import { Columns, Column } from './extensions/ColumnBlock'
 import { updatePageContent } from '@/app/actions/pages'
 import { usePagesStore } from '@/store/pagesStore'
+import AISelectionMenu from './AISelectionMenu'
 
 // ─── Drag handle button style (hoisted to top so it's available in JSX) ──────
 
@@ -918,6 +919,11 @@ export default function TipTapEditor({
                 <BB onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered list">1.</BB>
                 <BB onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Todo list">☑</BB>
                 <BB onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Quote">❝</BB>
+
+                <Divider />
+
+                {/* AI actions */}
+                <AISelectionMenu editor={editor} />
               </div>
             )}
           </div>
