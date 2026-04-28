@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import WelcomeAnimation from '@/components/WelcomeAnimation'
 import { createPage, Page } from '@/app/actions/pages'
+import AIWriteModal from '@/components/editor/AIWriteModal'
 import Link from 'next/link'
 
 import {
@@ -326,6 +327,7 @@ export default function DashboardClient({
   const [showAnim, setShowAnim] = useState(showWelcome)
   const [isPending, startTransition] = useTransition()
   const [createError, setCreateError] = useState<string | null>(null)
+  const [showAIWrite, setShowAIWrite] = useState(false)
 
   useEffect(() => {
     if (showWelcome) {
@@ -493,7 +495,7 @@ export default function DashboardClient({
                 icon={<Sparkles size={15} />}
                 label="AI Write"
                 desc="Generate a page from a prompt"
-                onClick={handleNewPage}
+                onClick={() => setShowAIWrite(true)}
                 loading={isPending}
               />
               <QuickActionCard
@@ -626,6 +628,13 @@ export default function DashboardClient({
           }
         `}</style>
       </div>
+
+      {showAIWrite && (
+        <AIWriteModal
+          workspaceId={workspaceId}
+          onClose={() => setShowAIWrite(false)}
+        />
+      )}
     </>
   )
 }

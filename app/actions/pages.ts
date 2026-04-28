@@ -72,6 +72,40 @@ export async function getPage(pageId: string): Promise<Page | null> {
   return data as Page | null
 }
 
+// ─── Create a page pre-filled with content (no redirect) ───────────────────
+// Used by AI Write flow — creates the page and returns the id.
+
+export async function createPageWithContent(
+  workspaceId: string,
+  title: string,
+  emoji: string,
+  content: object
+): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await supabase
+    .from('pages')
+    .insert({
+      workspace_id: workspaceId,
+      title: title || 'Untitled',
+      emoji: emoji || '✨',
+      content,
+      created_by: user.id,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    console.error('[createPageWithContent] error:', error)
+    throw new Error('Failed to create page')
+  }
+
+  revalidatePath('/dashboard')
+  return data.id
+}
+
 // ─── Create a new page ──────────────────────────────────────────────────────
 
 export async function createPage(workspaceId: string) {
